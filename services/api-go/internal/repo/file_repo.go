@@ -25,3 +25,11 @@ func (r FileRepo) FindByID(id uint) (*model.File, error) {
 	}
 	return &f, nil
 }
+
+func (r FileRepo) FindByIDForOwner(id, ownerID uint) (*model.File, error) {
+	var f model.File
+	if err := r.DB.Where("id = ? AND owner_id = ?", id, ownerID).First(&f).Error; err != nil {
+		return nil, err
+	}
+	return &f, nil
+}

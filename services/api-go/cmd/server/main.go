@@ -26,7 +26,8 @@ func main() {
 	shareRepo := repo.ShareRepo{DB: database}
 
 	authSvc := service.AuthService{Users: userRepo, JWTSecret: cfg.JWTSecret, TokenTTLMin: cfg.TokenTTLMin}
-	fileSvc := service.FileService{Files: fileRepo, Storage: storage.LocalStorage{BasePath: cfg.StoragePath}}
+	fileStorage := storage.NewProvider(cfg.StorageKind, cfg.StoragePath)
+	fileSvc := service.FileService{Files: fileRepo, Storage: fileStorage}
 	shareSvc := service.ShareService{Shares: shareRepo, Files: fileRepo}
 
 	authHandler := handler.AuthHandler{Auth: authSvc}

@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"strconv"
 	"yourcloud/backend-go/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type FileHandler struct {
@@ -40,21 +42,25 @@ func (h FileHandler) List(c *gin.Context) {
 
 func (h FileHandler) Download(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
-	id, _ := strconv.Atoi(c.Param("id"))
-	files, err := h.Files.List(userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "LIST_FAILED", "message": err.Error()}})
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid file id"}})
 		return
 	}
-	for _, f := range files {
-		if int(f.ID) == id {
-			if _, err := os.Stat(f.StoredPath); err != nil {
-				c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "file data missing"}})
-				return
-			}
-			c.FileAttachment(f.StoredPath, f.Filename)
+
+	f, err := h.Files.FindDownloadByOwner(userID, uint(id))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "file not found"}})
 			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "DOWNLOAD_FAILED", "message": "download failed"}})
+		return
 	}
-	c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "file not found"}})
+
+	if _, err := os.Stat(f.StoredPath); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "file data missing"}})
+		return
+	}
+	c.FileAttachment(f.StoredPath, f.Filename)
 }

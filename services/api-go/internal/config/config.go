@@ -12,6 +12,7 @@ type Config struct {
 	DBURL       string
 	JWTSecret   string
 	StoragePath string
+	StorageKind string
 	TokenTTLMin int
 }
 
@@ -23,6 +24,7 @@ func Load() Config {
 		DBURL:       getEnv("DB_URL", "postgres://yourcloud:yourcloud@localhost:5432/yourcloud?sslmode=disable"),
 		JWTSecret:   getEnv("JWT_SECRET", "dev-secret"),
 		StoragePath: getEnv("STORAGE_PATH", "apps/backend-go/uploads"),
+		StorageKind: getEnv("STORAGE_PROVIDER", "local"),
 		TokenTTLMin: ttl,
 	}
 }

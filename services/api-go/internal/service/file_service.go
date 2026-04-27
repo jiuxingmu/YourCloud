@@ -9,7 +9,7 @@ import (
 
 type FileService struct {
 	Files   repo.FileRepo
-	Storage storage.LocalStorage
+	Storage storage.Provider
 }
 
 func (s FileService) Upload(ownerID uint, fh *multipart.FileHeader) (*model.File, error) {
@@ -32,4 +32,8 @@ func (s FileService) Upload(ownerID uint, fh *multipart.FileHeader) (*model.File
 
 func (s FileService) List(ownerID uint) ([]model.File, error) {
 	return s.Files.ListByOwner(ownerID)
+}
+
+func (s FileService) FindDownloadByOwner(ownerID, fileID uint) (*model.File, error) {
+	return s.Files.FindByIDForOwner(fileID, ownerID)
 }

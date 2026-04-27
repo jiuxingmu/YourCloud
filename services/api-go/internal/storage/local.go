@@ -13,6 +13,15 @@ type LocalStorage struct {
 	BasePath string
 }
 
+func (s LocalStorage) Name() string {
+	return "local"
+}
+
+func (s LocalStorage) Exists(storedPath string) error {
+	_, err := os.Stat(storedPath)
+	return err
+}
+
 func (s LocalStorage) Save(fileHeader *multipart.FileHeader) (string, int64, error) {
 	if err := os.MkdirAll(s.BasePath, 0o755); err != nil {
 		return "", 0, err
