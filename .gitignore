@@ -1,17 +1,29 @@
-.gradle/
-.kotlin/
-build/
+# OS / Editor
+.DS_Store
 .idea/
 .vscode/
 *.iml
-local.properties
-node_modules/
-apps/web/build/
-apps/web/.kotlin/
-apps/backend/.kotlin/
-uploads/
-kotlin-js-store/
-out/
-*.log
-.DS_Store
+
+# Environment
 .env
+local.properties
+
+# Runtime / logs
+.dev/
+*.log
+
+# Build artifacts
+build/
+out/
+**/build/
+
+# Node / Vite
+node_modules/
+clients/web/node_modules/
+clients/web/dist/
+clients/web/tsconfig.tsbuildinfo
+
+# Go
+services/api-go/bin/
+services/api-go/coverage.out
+services/api-go/uploads/
