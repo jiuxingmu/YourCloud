@@ -27,3 +27,4 @@ clients/web/tsconfig.tsbuildinfo
 services/api-go/bin/
 services/api-go/coverage.out
 services/api-go/uploads/
+services/api-go/apps/backend-go/uploads/
