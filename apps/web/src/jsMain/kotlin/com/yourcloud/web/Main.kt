@@ -48,6 +48,8 @@ private var uploading = false
 private var uploadCancelled = false
 private var activeUploadXhr: dynamic = null
 private var latestShareToken: String? = null
+private var cachedFiles: List<FileItem> = emptyList()
+private var selectedFileIds = mutableSetOf<String>()
 
 fun main() {
     window.onhashchange = {
@@ -67,25 +69,25 @@ private fun render() {
     }
 
     root.innerHTML = """
-        <div style="font-family: sans-serif; max-width: 860px; margin: 24px auto;">
-          <h2 style="margin-bottom:8px;">YourCloud Web MVP</h2>
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 980px; margin: 20px auto; padding: 0 12px;">
+          <h2 style="margin-bottom:8px;">YourCloud</h2>
           <p style="color:#666;margin-top:0;">登录 -> 上传 -> 列表 -> 下载 -> 分享</p>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#f7f7f8;padding:12px;border-radius:10px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#f7f9fc;padding:14px;border-radius:12px;border:1px solid #e8edf5;">
             <input id="accountInput" placeholder="账号（例如 demo）" style="padding:10px;border:1px solid #ddd;border-radius:8px;" />
             <input id="passwordInput" type="password" placeholder="密码（例如 demo）" style="padding:10px;border:1px solid #ddd;border-radius:8px;" />
             <button id="registerBtn" style="padding:10px;border-radius:8px;border:1px solid #ddd;background:white;cursor:pointer;">注册</button>
             <button id="loginBtn" style="padding:10px;border-radius:8px;border:0;background:#111;color:white;cursor:pointer;">登录</button>
           </div>
 
-          <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+          <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#f7f9fc;padding:14px;border-radius:12px;border:1px solid #e8edf5;">
             <input id="fileInput" type="file" />
             <button id="uploadBtn" style="padding:8px 12px;border-radius:8px;border:0;background:#111;color:white;cursor:pointer;">上传</button>
             <button id="cancelUploadBtn" style="display:none;padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:white;cursor:pointer;">取消上传</button>
             <button id="refreshBtn" style="padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:white;cursor:pointer;">刷新列表</button>
           </div>
 
-          <div style="margin-top:12px;display:flex;gap:10px;align-items:center;background:#f7f7f8;padding:12px;border-radius:10px;">
+          <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#f7f9fc;padding:14px;border-radius:12px;border:1px solid #e8edf5;">
             <input id="shareTokenInput" placeholder="分享 token" style="padding:8px;border:1px solid #ddd;border-radius:8px;min-width:220px;" />
             <input id="shareCodeInput" placeholder="提取码（可选）" style="padding:8px;border:1px solid #ddd;border-radius:8px;min-width:140px;" />
             <button id="previewShareBtn" style="padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:white;cursor:pointer;">查看分享</button>
@@ -96,10 +98,23 @@ private fun render() {
             <button id="openShareRouteBtn" style="display:none;padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:white;cursor:pointer;">打开分享访问页</button>
           </div>
 
-          <div style="margin-top:16px;">
+          <div style="margin-top:16px;background:#f7f9fc;padding:14px;border-radius:12px;border:1px solid #e8edf5;">
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div style="display:flex;gap:10px;align-items:center;">
+                <input id="fileSearchInput" placeholder="搜索文件名" style="padding:8px;border:1px solid #ddd;border-radius:8px;min-width:220px;" />
+                <select id="fileSortSelect" style="padding:8px;border:1px solid #ddd;border-radius:8px;background:white;">
+                  <option value="time_desc">时间：最新</option>
+                  <option value="time_asc">时间：最早</option>
+                  <option value="name_asc">名称：A-Z</option>
+                  <option value="name_desc">名称：Z-A</option>
+                </select>
+              </div>
+              <button id="batchDownloadBtn" style="padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:white;cursor:pointer;" disabled>批量下载选中</button>
+            </div>
             <table style="width:100%;border-collapse:collapse;">
               <thead>
                 <tr style="text-align:left;border-bottom:1px solid #e5e5e5;">
+                  <th style="padding:8px;">选择</th>
                   <th style="padding:8px;">文件名</th>
                   <th style="padding:8px;">大小</th>
                   <th style="padding:8px;">时间</th>
@@ -143,15 +158,18 @@ private fun bindEvents() {
     val uploadBtn = document.getElementById("uploadBtn") as HTMLButtonElement
     val cancelUploadBtn = document.getElementById("cancelUploadBtn") as? HTMLButtonElement
     val refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement
+    val fileSearchInput = document.getElementById("fileSearchInput") as? HTMLInputElement
+    val fileSortSelect = document.getElementById("fileSortSelect")
+    val batchDownloadBtn = document.getElementById("batchDownloadBtn") as? HTMLButtonElement
     val previewShareBtn = document.getElementById("previewShareBtn") as HTMLButtonElement
     val downloadShareBtn = document.getElementById("downloadShareBtn") as HTMLButtonElement
     val openShareRouteBtn = document.getElementById("openShareRouteBtn") as? HTMLButtonElement
 
     registerBtn.onclick = {
-        scope.launch { register() }
+        scope.launch { withButtonLoading(registerBtn, "注册中...") { register() } }
     }
     loginBtn.onclick = {
-        scope.launch { login() }
+        scope.launch { withButtonLoading(loginBtn, "登录中...") { login() } }
     }
     uploadBtn.onclick = {
         scope.launch { upload() }
@@ -160,13 +178,22 @@ private fun bindEvents() {
         cancelCurrentUpload()
     }
     refreshBtn.onclick = {
-        scope.launch { renderFiles() }
+        scope.launch { withButtonLoading(refreshBtn, "刷新中...") { renderFiles() } }
     }
     previewShareBtn.onclick = {
-        scope.launch { previewSharedFile() }
+        scope.launch { withButtonLoading(previewShareBtn, "查询中...") { previewSharedFile() } }
     }
     downloadShareBtn.onclick = {
         downloadSharedFile()
+    }
+    fileSearchInput?.oninput = {
+        renderFileTable()
+    }
+    fileSortSelect?.asDynamic()?.onchange = {
+        renderFileTable()
+    }
+    batchDownloadBtn?.onclick = {
+        downloadSelectedFiles()
     }
     openShareRouteBtn?.onclick = {
         val current = latestShareToken
@@ -272,28 +299,60 @@ private suspend fun renderFiles() {
             headers.append("Authorization", "Bearer $token")
         }.body<List<FileItem>>()
     }.onSuccess { files ->
-        tbody.innerHTML = ""
-        files.forEach { file ->
-            val tr = document.createElement("tr")
-            tr.innerHTML = """
-              <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${file.name}</td>
-              <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${file.size}</td>
-              <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${file.createdAt}</td>
-              <td style="padding:8px;border-bottom:1px solid #f0f0f0;">
-                <button data-download="${file.id}" style="margin-right:8px;padding:6px 10px;border:1px solid #ddd;background:white;border-radius:6px;cursor:pointer;">下载</button>
-                <button data-share="${file.id}" style="padding:6px 10px;border:0;background:#111;color:white;border-radius:6px;cursor:pointer;">分享</button>
-              </td>
-            """.trimIndent()
-            tbody.appendChild(tr)
-        }
-        bindTableActions()
+        cachedFiles = files
+        selectedFileIds.clear()
+        renderFileTable()
         setOutput("文件数：${files.size}")
     }.onFailure {
         setOutput("加载文件失败：${it.message}")
     }
 }
 
+private fun renderFileTable() {
+    val tbody = document.getElementById("fileTableBody") ?: return
+    val query = (document.getElementById("fileSearchInput") as? HTMLInputElement)?.value?.trim().orEmpty().lowercase()
+    val sort = (document.getElementById("fileSortSelect")?.asDynamic()?.value as? String) ?: "time_desc"
+    val filtered = cachedFiles.filter { it.name.lowercase().contains(query) }
+    val sorted = when (sort) {
+        "time_asc" -> filtered.sortedBy { it.createdAt }
+        "name_asc" -> filtered.sortedBy { it.name.lowercase() }
+        "name_desc" -> filtered.sortedByDescending { it.name.lowercase() }
+        else -> filtered.sortedByDescending { it.createdAt }
+    }
+
+    tbody.innerHTML = ""
+    sorted.forEach { file ->
+        val checked = if (selectedFileIds.contains(file.id)) "checked" else ""
+        val tr = document.createElement("tr")
+        tr.innerHTML = """
+          <td style="padding:8px;border-bottom:1px solid #f0f0f0;">
+            <input type="checkbox" data-select-id="${file.id}" $checked />
+          </td>
+          <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${file.name}</td>
+          <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${file.size}</td>
+          <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${file.createdAt}</td>
+          <td style="padding:8px;border-bottom:1px solid #f0f0f0;">
+            <button data-download="${file.id}" style="margin-right:8px;padding:6px 10px;border:1px solid #ddd;background:white;border-radius:6px;cursor:pointer;">下载</button>
+            <button data-share="${file.id}" style="padding:6px 10px;border:0;background:#111;color:white;border-radius:6px;cursor:pointer;">分享</button>
+          </td>
+        """.trimIndent()
+        tbody.appendChild(tr)
+    }
+    bindTableActions()
+    updateBatchDownloadButtonState()
+}
+
 private fun bindTableActions() {
+    document.querySelectorAll("input[data-select-id]").asList().forEach { node ->
+        node.asDynamic().onchange = {
+            val id = node.asDynamic().getAttribute("data-select-id") as? String
+            val checked = node.asDynamic().checked as? Boolean ?: false
+            if (!id.isNullOrBlank()) {
+                if (checked) selectedFileIds.add(id) else selectedFileIds.remove(id)
+            }
+            updateBatchDownloadButtonState()
+        }
+    }
     document.querySelectorAll("button[data-download]").asList().forEach { node ->
         (node as HTMLButtonElement).onclick = {
             val fileId = node.getAttribute("data-download")
@@ -310,6 +369,22 @@ private fun bindTableActions() {
             }
         }
     }
+}
+
+private fun updateBatchDownloadButtonState() {
+    val button = document.getElementById("batchDownloadBtn") as? HTMLButtonElement ?: return
+    button.disabled = selectedFileIds.isEmpty()
+}
+
+private fun downloadSelectedFiles() {
+    if (selectedFileIds.isEmpty()) {
+        setOutput("请先勾选要下载的文件")
+        return
+    }
+    selectedFileIds.forEach { id ->
+        downloadFile(id)
+    }
+    setOutput("已发起 ${selectedFileIds.size} 个文件下载")
 }
 
 private fun downloadFile(fileId: String) {
@@ -484,6 +559,19 @@ private fun cancelCurrentUpload() {
     if (!uploading) return
     uploadCancelled = true
     activeUploadXhr?.abort()
+}
+
+private suspend fun withButtonLoading(button: HTMLButtonElement, loadingText: String, block: suspend () -> Unit) {
+    val originalText = button.textContent ?: ""
+    val originalDisabled = button.disabled
+    button.disabled = true
+    button.textContent = loadingText
+    try {
+        block()
+    } finally {
+        button.disabled = originalDisabled
+        button.textContent = originalText
+    }
 }
 
 private fun inputValue(id: String): String {
