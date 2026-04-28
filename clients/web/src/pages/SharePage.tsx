@@ -16,6 +16,13 @@ export function isExtractCodeError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 403 && error.code === 'EXTRACT_CODE_INVALID'
 }
 
+export function mapShareErrorMessage(error: unknown): string {
+  if (isExtractCodeError(error)) return '请输入正确的提取码后访问'
+  if (error instanceof ApiRequestError && error.status === 410 && error.code === 'EXPIRED') return '分享链接已过期'
+  if (error instanceof ApiRequestError && error.status === 404 && error.code === 'NOT_FOUND') return '分享内容不存在或已被删除'
+  return SHARE_LINK_INVALID_TEXT
+}
+
 export default function SharePage({ token }: Props) {
   const [data, setData] = useState<{ file: { filename: string; id: number; mimeType?: string } } | null>(null)
   const [error, setError] = useState('')
@@ -23,7 +30,7 @@ export default function SharePage({ token }: Props) {
   const [requiresExtractCode, setRequiresExtractCode] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
+  async function loadShare(currentCode = '') {
     const validationError = getShareValidationError(token)
     if (validationError) {
       setData(null)
@@ -31,23 +38,24 @@ export default function SharePage({ token }: Props) {
       return
     }
     setLoading(true)
-    getShare(token, extractCode)
-      .then((payload) => {
-        setData(payload)
-        setError('')
-        setRequiresExtractCode(false)
-      })
-      .catch((err: unknown) => {
-        setData(null)
-        if (isExtractCodeError(err)) {
-          setError('请输入正确的提取码后访问')
-          setRequiresExtractCode(true)
-          return
-        }
-        setError(SHARE_LINK_INVALID_TEXT)
-      })
-      .finally(() => setLoading(false))
-  }, [token, extractCode])
+    try {
+      const payload = await getShare(token, currentCode)
+      setData(payload)
+      setError('')
+      setRequiresExtractCode(false)
+    } catch (err: unknown) {
+      setData(null)
+      const message = mapShareErrorMessage(err)
+      setError(message)
+      setRequiresExtractCode(isExtractCodeError(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadShare('')
+  }, [token])
 
   return (
     <Box sx={{ maxWidth: 960, mx: 'auto' }}>
@@ -60,14 +68,18 @@ export default function SharePage({ token }: Props) {
             <Chip label="分享文件" size="small" sx={{ alignSelf: 'flex-start' }} />
             {error && <Alert severity="error">{error}</Alert>}
             {requiresExtractCode && (
-              <TextField
-                label="提取码"
-                value={extractCode}
-                onChange={(event) => setExtractCode(event.target.value)}
-                placeholder="请输入提取码"
-                size="small"
-                sx={{ maxWidth: 260 }}
-              />
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ maxWidth: 360 }}>
+                <TextField
+                  label="提取码"
+                  value={extractCode}
+                  onChange={(event) => setExtractCode(event.target.value)}
+                  placeholder="请输入提取码"
+                  size="small"
+                />
+                <Button variant="outlined" onClick={() => void loadShare(extractCode)} disabled={loading || !extractCode.trim()}>
+                  验证提取码
+                </Button>
+              </Stack>
             )}
             {data && (
               <>

@@ -162,9 +162,10 @@ func (h FileHandler) CreateFolder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "path is required"}})
 		return
 	}
-	if err := h.Files.CreateFolder(userID, req.Path); err != nil {
+	folder, err := h.Files.CreateFolder(userID, req.Path)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "CREATE_FOLDER_FAILED", "message": err.Error()}})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"data": gin.H{"ok": true}})
+	c.JSON(http.StatusCreated, gin.H{"data": folder})
 }

@@ -66,7 +66,6 @@ export function useFileActions(options: Options) {
     setShareQrUrl('')
     setShareExpiresAt(null)
     setShareDialogOpen(true)
-    void generateShareFor(file, 3, '')
   }
 
   function updateShareDisplay(payload: ShareResult) {
@@ -83,8 +82,6 @@ export function useFileActions(options: Options) {
 
   function changeShareExpireDays(nextExpireDays: number) {
     setShareExpireDays(nextExpireDays)
-    if (!shareSourceFile) return
-    void generateShareFor(shareSourceFile, nextExpireDays, shareExtractCode)
   }
 
   async function copyShareLink() {
@@ -114,6 +111,10 @@ export function useFileActions(options: Options) {
   }
 
   function requestDeleteFile(file: FileItem) {
+    if (file.id <= 0) {
+      showFeedback('error', '该目录来自路径推断，暂不支持直接删除，请先整理真实目录结构')
+      return
+    }
     setDeleteTargetFile(file)
     setDeleteDialogOpen(true)
   }
@@ -127,6 +128,10 @@ export function useFileActions(options: Options) {
   }
 
   function requestMoveFile(file: FileItem) {
+    if (file.id <= 0) {
+      showFeedback('error', '该目录来自路径推断，暂不支持直接移动，请先整理真实目录结构')
+      return
+    }
     setMoveTargetFile(file)
     setMoveTargetFolderPath(getParentPath(file.filename))
     setMoveDialogOpen(true)

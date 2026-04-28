@@ -65,8 +65,12 @@ func TestFileServiceCreateFolder(t *testing.T) {
 		Storage: storage.LocalStorage{BasePath: basePath},
 	}
 
-	if err := svc.CreateFolder(1, "projects/demo"); err != nil {
+	created, err := svc.CreateFolder(1, "projects/demo")
+	if err != nil {
 		t.Fatalf("create folder: %v", err)
+	}
+	if created == nil || created.Filename != "projects/demo" {
+		t.Fatalf("expected created folder metadata, got %#v", created)
 	}
 
 	if _, err := os.Stat(filepath.Join(basePath, "projects/demo")); err != nil {
@@ -81,7 +85,7 @@ func TestFileServiceCreateFolder(t *testing.T) {
 		t.Fatalf("expected directory mime type, got %s", saved.MimeType)
 	}
 
-	if err := svc.CreateFolder(1, "../escape"); err == nil {
+	if _, err := svc.CreateFolder(1, "../escape"); err == nil {
 		t.Fatalf("expected invalid folder path error")
 	}
 }

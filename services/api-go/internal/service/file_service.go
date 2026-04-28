@@ -144,18 +144,18 @@ func (s FileService) MoveByOwner(ownerID, fileID uint, nextFilename string) (*mo
 	return s.Files.FindByIDForOwner(fileID, ownerID)
 }
 
-func (s FileService) CreateFolder(ownerID uint, folderPath string) error {
+func (s FileService) CreateFolder(ownerID uint, folderPath string) (*model.File, error) {
 	path := normalizePath(folderPath)
 	if path == "" {
-		return gorm.ErrInvalidData
+		return nil, gorm.ErrInvalidData
 	}
 	if err := s.Storage.CreateFolder(path); err != nil {
-		return err
+		return nil, err
 	}
-	if _, err := s.Files.FindByFilenameForOwner(path, ownerID); err == nil {
-		return nil
+	if existing, err := s.Files.FindByFilenameForOwner(path, ownerID); err == nil {
+		return existing, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+		return nil, err
 	}
 	f := &model.File{
 		OwnerID:    ownerID,
@@ -164,5 +164,8 @@ func (s FileService) CreateFolder(ownerID uint, folderPath string) error {
 		Size:       0,
 		MimeType:   "inode/directory",
 	}
-	return s.Files.Create(f)
+	if err := s.Files.Create(f); err != nil {
+		return nil, err
+	}
+	return f, nil
 }
