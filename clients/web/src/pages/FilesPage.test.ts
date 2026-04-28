@@ -17,10 +17,10 @@ describe('FilesPage helpers', () => {
     expect(shouldShowCreateActions('trash')).toBe(false)
   })
 
-  it('shows create actions in work sections', () => {
+  it('shows create actions only in drive and starred sections', () => {
     expect(shouldShowCreateActions('drive')).toBe(true)
-    expect(shouldShowCreateActions('recent')).toBe(true)
     expect(shouldShowCreateActions('starred')).toBe(true)
+    expect(shouldShowCreateActions('recent')).toBe(false)
   })
 
   it('returns folder-specific delete dialog copy', () => {

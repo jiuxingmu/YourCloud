@@ -37,7 +37,7 @@ type TypeFilter = 'all' | 'doc' | 'sheet' | 'slide' | 'image' | 'pdf' | 'video' 
 type TimeFilter = 'all' | 'today' | '7d' | '30d' | 'thisYear' | 'lastYear'
 
 export function shouldShowCreateActions(section: Section): boolean {
-  return section !== 'home' && section !== 'trash'
+  return section === 'drive' || section === 'starred'
 }
 
 export function getDeleteDialogTitle(file: FileItem | null): string {
