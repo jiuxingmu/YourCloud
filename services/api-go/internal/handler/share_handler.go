@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 	"yourcloud/backend-go/internal/preview"
 	"yourcloud/backend-go/internal/repo"
@@ -21,6 +22,7 @@ type ShareHandler struct {
 type createShareReq struct {
 	FileID      uint `json:"fileId"`
 	ExpireHours int  `json:"expireHours"`
+	ExtractCode string `json:"extractCode"`
 }
 
 func (h ShareHandler) Create(c *gin.Context) {
@@ -29,11 +31,12 @@ func (h ShareHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid payload"}})
 		return
 	}
-	if req.ExpireHours <= 0 {
-		req.ExpireHours = 24
+	if req.ExpireHours < 0 {
+		req.ExpireHours = 72
 	}
 	userID := c.MustGet("userID").(uint)
-	s, err := h.Shares.Create(userID, req.FileID, req.ExpireHours)
+	extractCode := strings.TrimSpace(req.ExtractCode)
+	s, err := h.Shares.CreateWithOptions(userID, req.FileID, req.ExpireHours, extractCode)
 	if err != nil {
 		status := http.StatusBadRequest
 		if err.Error() == "forbidden" {
@@ -42,7 +45,16 @@ func (h ShareHandler) Create(c *gin.Context) {
 		c.JSON(status, gin.H{"error": gin.H{"code": "SHARE_FAILED", "message": err.Error()}})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"data": s})
+	baseURL := c.Request.Header.Get("Origin")
+	if strings.TrimSpace(baseURL) == "" {
+		baseURL = "http://" + c.Request.Host
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": gin.H{
+		"token":       s.Token,
+		"url":         baseURL + "/share/" + s.Token,
+		"expiresAt":   s.ExpiresAt,
+		"extractCode": extractCode,
+	}})
 }
 
 func (h ShareHandler) GetByToken(c *gin.Context) {

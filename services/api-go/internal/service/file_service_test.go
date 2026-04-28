@@ -53,7 +53,15 @@ func TestFileServiceFindDownloadByOwner(t *testing.T) {
 
 func TestFileServiceCreateFolder(t *testing.T) {
 	basePath := t.TempDir()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.File{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	svc := FileService{
+		Files:   repo.FileRepo{DB: db},
 		Storage: storage.LocalStorage{BasePath: basePath},
 	}
 
@@ -63,6 +71,14 @@ func TestFileServiceCreateFolder(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(basePath, "projects/demo")); err != nil {
 		t.Fatalf("expected folder created: %v", err)
+	}
+
+	saved, err := svc.Files.FindByFilenameForOwner("projects/demo", 1)
+	if err != nil {
+		t.Fatalf("expected folder persisted in db: %v", err)
+	}
+	if saved.MimeType != "inode/directory" {
+		t.Fatalf("expected directory mime type, got %s", saved.MimeType)
 	}
 
 	if err := svc.CreateFolder(1, "../escape"); err == nil {

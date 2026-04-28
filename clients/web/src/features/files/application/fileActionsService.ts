@@ -11,6 +11,13 @@ type ShareDeps = {
   createShareApi: typeof createShare
 }
 
+export type ShareResult = {
+  url: string
+  token: string
+  expiresAt?: string
+  extractCode?: string
+}
+
 type DownloadDeps = {
   canDownloadFile: (file: FileItem) => boolean
   fetchImpl: typeof fetch
@@ -41,19 +48,21 @@ export function buildShareLinkFromResponse(url: string | undefined, origin: stri
 
 export async function createFileShareService(
   file: FileItem,
+  options: { expireHours: number; extractCode: string },
   showFeedback: FeedbackFn,
   toErrorMessage: ErrorMessageFn,
   deps: ShareDeps = { createShareApi: createShare },
-): Promise<string | null> {
+): Promise<ShareResult | null> {
   if (file.mimeType === 'inode/directory') {
     showFeedback('error', '文件夹暂不支持创建分享链接')
     return null
   }
   try {
-    const data = await deps.createShareApi(file.id, 24)
-    const link = buildShareLinkFromResponse(data.url, location.origin)
+    const expireHours = Math.max(0, Math.floor(options.expireHours))
+    const data = await deps.createShareApi(file.id, expireHours, options.extractCode.trim())
+    const link = data.token ? `${location.origin}/share/${data.token}` : buildShareLinkFromResponse(data.url, location.origin)
     showFeedback('success', `已创建分享链接：${file.filename}`)
-    return link
+    return { url: link, token: data.token, expiresAt: data.expiresAt, extractCode: data.extractCode }
   } catch (error) {
     showFeedback('error', toErrorMessage(error))
     return null

@@ -26,6 +26,7 @@ type Share struct {
 	Token     string     `gorm:"uniqueIndex;size:128;not null" json:"token"`
 	FileID    uint       `gorm:"index;not null" json:"fileId"`
 	CreatedBy uint       `gorm:"index;not null" json:"createdBy"`
+	Passcode  string     `gorm:"size:64" json:"-"`
 	ExpiresAt *time.Time `json:"expiresAt"`
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`

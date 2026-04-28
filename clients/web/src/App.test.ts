@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getShareTokenFromLocation, isShareRoute } from './App'
+import { avatarTextFromName, displayNameFromEmail, getShareTokenFromLocation, isShareRoute } from './App'
 
 describe('getShareTokenFromLocation', () => {
   it('parses token from query string', () => {
@@ -31,5 +31,26 @@ describe('isShareRoute', () => {
     expect(isShareRoute('/')).toBe(false)
     expect(isShareRoute('/drive')).toBe(false)
     expect(isShareRoute('/sharex')).toBe(false)
+  })
+})
+
+describe('displayNameFromEmail', () => {
+  it('derives readable display name from email local part', () => {
+    expect(displayNameFromEmail('xuegao.wu@yourcloud.app')).toBe('Xuegao Wu')
+    expect(displayNameFromEmail('dev_ops-team@yourcloud.app')).toBe('Dev Ops Team')
+  })
+
+  it('falls back for invalid empty local part', () => {
+    expect(displayNameFromEmail('@yourcloud.app')).toBe('YourCloud 用户')
+  })
+})
+
+describe('avatarTextFromName', () => {
+  it('uses first two initials for multi-word names', () => {
+    expect(avatarTextFromName('Xuegao Wu')).toBe('XW')
+  })
+
+  it('uses first two letters for single-word names', () => {
+    expect(avatarTextFromName('Xuegao')).toBe('XU')
   })
 })

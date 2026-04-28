@@ -1,6 +1,6 @@
 import { useState, type MouseEvent } from 'react'
-import { createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, validateMoveTargetName } from '../application/fileActionsService'
-import { getDeleteFeedbackText, type DeletedItem, type FileItem } from '../domain'
+import { createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, validateMoveTargetName, type ShareResult } from '../application/fileActionsService'
+import { getBaseName, getDeleteFeedbackText, getParentPath, normalizePath, type DeletedItem, type FileItem } from '../domain'
 
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
 type ErrorMessageFn = (error: unknown) => string
@@ -17,27 +17,74 @@ type Options = {
   setVirtualFolders: React.Dispatch<React.SetStateAction<FileItem[]>>
   setFiles: React.Dispatch<React.SetStateAction<FileItem[]>>
   virtualFoldersRef: React.MutableRefObject<FileItem[]>
+  currentDrivePath: string
 }
 
 export function useFileActions(options: Options) {
-  const { showFeedback, toErrorMessage, canDownloadFile, load, deletedItems, persistDeleted, starredIds, persistStarred, setVirtualFolders, setFiles, virtualFoldersRef } =
+  const { showFeedback, toErrorMessage, canDownloadFile, load, deletedItems, persistDeleted, starredIds, persistStarred, setVirtualFolders, setFiles, virtualFoldersRef, currentDrivePath } =
     options
 
   const [downloadingId, setDownloadingId] = useState<number | null>(null)
   const [shareLink, setShareLink] = useState('')
+  const [shareToken, setShareToken] = useState('')
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [shareExpireDays, setShareExpireDays] = useState(3)
+  const [shareExtractCode, setShareExtractCode] = useState('')
+  const [shareSourceFile, setShareSourceFile] = useState<FileItem | null>(null)
+  const [shareQrUrl, setShareQrUrl] = useState('')
+  const [shareCreating, setShareCreating] = useState(false)
+  const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null)
   const [actionAnchor, setActionAnchor] = useState<null | HTMLElement>(null)
   const [actionFile, setActionFile] = useState<FileItem | null>(null)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderPathInput, setFolderPathInput] = useState('')
   const [moveDialogOpen, setMoveDialogOpen] = useState(false)
-  const [moveFilenameInput, setMoveFilenameInput] = useState('')
+  const [moveTargetFolderPath, setMoveTargetFolderPath] = useState('')
   const [moveTargetFile, setMoveTargetFile] = useState<FileItem | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTargetFile, setDeleteTargetFile] = useState<FileItem | null>(null)
 
-  async function createFileShare(file: FileItem) {
-    const link = await createFileShareService(file, showFeedback, toErrorMessage)
-    if (link) setShareLink(link)
+  async function generateShareFor(file: FileItem, expireDays: number, extractCode: string) {
+    setShareCreating(true)
+    const expireHours = expireDays === 0 ? 0 : expireDays * 24
+    const result = await createFileShareService(
+      file,
+      { expireHours, extractCode },
+      showFeedback,
+      toErrorMessage,
+    )
+    if (result) updateShareDisplay(result)
+    setShareCreating(false)
+  }
+
+  function requestShareFile(file: FileItem) {
+    setShareSourceFile(file)
+    setShareExpireDays(3)
+    setShareExtractCode('')
+    setShareLink('')
+    setShareToken('')
+    setShareQrUrl('')
+    setShareExpiresAt(null)
+    setShareDialogOpen(true)
+    void generateShareFor(file, 3, '')
+  }
+
+  function updateShareDisplay(payload: ShareResult) {
+    setShareLink(payload.url)
+    setShareToken(payload.token)
+    setShareQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(payload.url)}`)
+    setShareExpiresAt(payload.expiresAt || null)
+  }
+
+  async function createFileShare() {
+    if (!shareSourceFile) return
+    await generateShareFor(shareSourceFile, shareExpireDays, shareExtractCode)
+  }
+
+  function changeShareExpireDays(nextExpireDays: number) {
+    setShareExpireDays(nextExpireDays)
+    if (!shareSourceFile) return
+    void generateShareFor(shareSourceFile, nextExpireDays, shareExtractCode)
   }
 
   async function copyShareLink() {
@@ -89,31 +136,30 @@ export function useFileActions(options: Options) {
 
   function requestMoveFile(file: FileItem) {
     setMoveTargetFile(file)
-    setMoveFilenameInput(file.filename)
+    setMoveTargetFolderPath(getParentPath(file.filename))
     setMoveDialogOpen(true)
   }
 
   async function confirmMoveFile() {
     const file = moveTargetFile
     if (!file) return
-    const nextName = validateMoveTargetName(moveFilenameInput)
-    if (!nextName) {
-      showFeedback('error', '请输入有效的目标名称')
-      return
-    }
+    const destinationFolder = moveTargetFolderPath.trim()
+    const basename = getBaseName(file.filename)
+    const nextName = validateMoveTargetName(destinationFolder ? `${destinationFolder}/${basename}` : basename)
+    if (!nextName) return
     if (file.mimeType === 'inode/directory') {
       setVirtualFolders((prev) => prev.map((f) => (f.id === file.id ? { ...f, filename: nextName, updatedAt: new Date().toISOString() } : f)))
       setFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, filename: nextName, updatedAt: new Date().toISOString() } : f)))
       showFeedback('success', `已移动：${file.filename}`)
       setMoveDialogOpen(false)
       setMoveTargetFile(null)
-      setMoveFilenameInput('')
+      setMoveTargetFolderPath('')
       return
     }
     await moveFileService(file, nextName, load, showFeedback, toErrorMessage)
     setMoveDialogOpen(false)
     setMoveTargetFile(null)
-    setMoveFilenameInput('')
+    setMoveTargetFolderPath('')
   }
 
   async function confirmCreateFolder() {
@@ -121,7 +167,9 @@ export function useFileActions(options: Options) {
       showFeedback('error', '请输入有效的文件夹名称')
       return
     }
-    await createFolderService(folderPathInput.trim(), setVirtualFolders, setFiles, virtualFoldersRef, load, showFeedback, toErrorMessage)
+    const childPath = normalizePath(folderPathInput.trim())
+    const nextPath = currentDrivePath ? normalizePath(`${currentDrivePath}/${childPath}`) : childPath
+    await createFolderService(nextPath, setVirtualFolders, setFiles, virtualFoldersRef, load, showFeedback, toErrorMessage)
     setFolderDialogOpen(false)
     setFolderPathInput('')
   }
@@ -139,19 +187,30 @@ export function useFileActions(options: Options) {
   return {
     downloadingId,
     shareLink,
+    shareToken,
+    shareQrUrl,
+    shareCreating,
+    shareExpiresAt,
+    shareDialogOpen,
+    shareExpireDays,
+    shareExtractCode,
+    shareSourceFile,
     actionAnchor,
     actionFile,
     folderDialogOpen,
     folderPathInput,
     moveDialogOpen,
-    moveFilenameInput,
+    moveTargetFolderPath,
     moveTargetFile,
     deleteDialogOpen,
     deleteTargetFile,
+    setShareDialogOpen,
+    setShareExpireDays: changeShareExpireDays,
+    setShareExtractCode,
     setFolderDialogOpen,
     setFolderPathInput,
     setMoveDialogOpen,
-    setMoveFilenameInput,
+    setMoveTargetFolderPath,
     setDeleteDialogOpen,
     openActionMenu,
     closeActionMenu,
@@ -161,6 +220,7 @@ export function useFileActions(options: Options) {
     confirmMoveFile,
     confirmCreateFolder,
     toggleStar,
+    requestShareFile,
     createFileShare,
     copyShareLink,
     download,

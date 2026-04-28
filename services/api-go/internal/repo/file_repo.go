@@ -43,3 +43,11 @@ func (r FileRepo) UpdateFilenameByIDForOwner(id, ownerID uint, filename string) 
 		Where("id = ? AND owner_id = ?", id, ownerID).
 		Update("filename", filename).Error
 }
+
+func (r FileRepo) FindByFilenameForOwner(filename string, ownerID uint) (*model.File, error) {
+	var f model.File
+	if err := r.DB.Where("filename = ? AND owner_id = ?", filename, ownerID).First(&f).Error; err != nil {
+		return nil, err
+	}
+	return &f, nil
+}

@@ -24,9 +24,9 @@ export function useFilesData(showFeedback: FeedbackFn, toErrorMessage: ErrorMess
     }
   }
 
-  async function upload(file: File) {
+  async function upload(file: File, folderPath = '') {
     try {
-      await uploadFile(file)
+      await uploadFile(file, folderPath)
       showFeedback('success', '上传成功。')
       await load()
       emitFilesChanged()

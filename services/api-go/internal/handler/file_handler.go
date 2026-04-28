@@ -23,8 +23,9 @@ func (h FileHandler) Upload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "file is required"}})
 		return
 	}
+	targetPath := c.PostForm("path")
 	userID := c.MustGet("userID").(uint)
-	f, err := h.Files.Upload(userID, fileHeader)
+	f, err := h.Files.Upload(userID, fileHeader, targetPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "UPLOAD_FAILED", "message": err.Error()}})
 		return

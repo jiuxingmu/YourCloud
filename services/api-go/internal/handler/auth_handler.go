@@ -47,3 +47,25 @@ func (h AuthHandler) Login(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"token": token, "user": gin.H{"id": u.ID, "email": u.Email}}})
 }
+
+func (h AuthHandler) Me(c *gin.Context) {
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "missing user context"}})
+		return
+	}
+
+	uid, ok := userID.(uint)
+	if !ok || uid == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "invalid user context"}})
+		return
+	}
+
+	user, err := h.Auth.GetUserByID(uid)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "user not found"}})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"id": user.ID, "email": user.Email}})
+}

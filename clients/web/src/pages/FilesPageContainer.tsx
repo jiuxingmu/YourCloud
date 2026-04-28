@@ -2,7 +2,7 @@ import { useEffect, useState, type ChangeEvent } from 'react'
 import { toUserFriendlyErrorMessage } from '../apiClient'
 import { onStarredCleared, onTrashCleared } from '../features/files/data/filesEvents'
 import { readDeletedItems, readStarredIds, writeDeletedItems, writeStarredIds } from '../features/files/data/filesStorage'
-import { canDownloadFile, deriveDriveItems, getRelativeBucket, shouldShowCreateActions, shouldUseTopRightViewSwitch, type DeletedItem } from '../features/files/domain'
+import { canDownloadFile, deriveDriveItems, getParentPath, getRelativeBucket, normalizePath, shouldShowCreateActions, shouldUseTopRightViewSwitch, type DeletedItem } from '../features/files/domain'
 import { useDriveNavigation } from '../features/files/hooks/useDriveNavigation'
 import { useFileActions } from '../features/files/hooks/useFileActions'
 import { useFilesData } from '../features/files/hooks/useFilesData'
@@ -55,7 +55,10 @@ export default function FilesPageContainer({ searchQuery = '', section = 'home' 
   function handleUploadChange(event: ChangeEvent<HTMLInputElement>) {
     const input = event.target
     const file = input.files?.[0]
-    if (file) void upload(file)
+    if (file) {
+      const uploadPath = section === 'drive' ? currentDrivePath : ''
+      void upload(file, uploadPath)
+    }
     input.value = ''
   }
 
@@ -71,6 +74,7 @@ export default function FilesPageContainer({ searchQuery = '', section = 'home' 
     setVirtualFolders,
     setFiles,
     virtualFoldersRef,
+    currentDrivePath,
   })
 
   const sectionFiles =
@@ -91,6 +95,16 @@ export default function FilesPageContainer({ searchQuery = '', section = 'home' 
   }
   const recommendedFiles = [...files].sort((a, b) => +new Date(b.updatedAt ?? b.createdAt ?? 0) - +new Date(a.updatedAt ?? a.createdAt ?? 0)).slice(0, 4)
   const recommendedFolder = files.find((file) => file.filename.includes('/'))?.filename.split('/')[0] || (files[0]?.filename.replace(/\.[^/.]+$/, '') || '示例文件夹')
+  const moveFolderOptions = Array.from(
+    files.reduce((acc, file) => {
+      const normalized = normalizePath(file.filename)
+      if (!normalized) return acc
+      if (file.mimeType === 'inode/directory') acc.add(normalized)
+      const parent = getParentPath(normalized)
+      if (parent) acc.add(parent)
+      return acc
+    }, new Set<string>()),
+  ).sort((a, b) => a.localeCompare(b, 'zh-CN'))
 
   return (
     <FilesPageView
@@ -122,6 +136,7 @@ export default function FilesPageContainer({ searchQuery = '', section = 'home' 
       closeFilterMenu={closeFilterMenu}
       setTypeFilter={setTypeFilter}
       setTimeFilter={setTimeFilter}
+      moveFolderOptions={moveFolderOptions}
     />
   )
 }

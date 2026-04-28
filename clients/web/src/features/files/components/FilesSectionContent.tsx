@@ -108,15 +108,6 @@ export function FilesSectionContent(props: Props) {
     )
   }
 
-  if (!loading && filteredCount === 0) {
-    return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
-        <Typography sx={{ fontWeight: 600, mb: 1 }}>没有匹配的文件</Typography>
-        <Typography color="text.secondary">尝试更换关键词，或点击“新建文件”上传内容。</Typography>
-      </Box>
-    )
-  }
-
   if (section === 'recent') {
     return (
       <Box sx={{ display: 'grid', gap: 2 }}>
@@ -130,19 +121,19 @@ export function FilesSectionContent(props: Props) {
   if (section === 'drive') {
     return (
       <Box sx={{ display: 'grid', gap: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Button size="large" onClick={() => setCurrentDrivePath('')} sx={{ fontSize: 46, fontWeight: 500, px: 0, minWidth: 0, lineHeight: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+            <Button size="large" onClick={() => setCurrentDrivePath('')} sx={{ fontSize: 34, fontWeight: 500, px: 0, minWidth: 0, lineHeight: 1.2 }}>
               我的云端硬盘
             </Button>
             {currentDrivePath && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: 'text.secondary' }}>
-                <Typography sx={{ fontSize: 40, lineHeight: 1 }}>›</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', flexWrap: 'wrap' }}>
+                <Typography sx={{ fontSize: 24, lineHeight: 1 }}>›</Typography>
                 {currentDrivePath.split('/').map((segment, idx, arr) => {
                   const path = arr.slice(0, idx + 1).join('/')
                   const isLast = idx === arr.length - 1
                   return (
-                    <Button key={path} size="large" onClick={() => setCurrentDrivePath(path)} disabled={isLast} sx={{ px: 0.5, minWidth: 0, fontSize: 40, fontWeight: isLast ? 500 : 400, lineHeight: 1 }}>
+                    <Button key={path} size="large" onClick={() => setCurrentDrivePath(path)} disabled={isLast} sx={{ px: 0.5, minWidth: 0, fontSize: 24, fontWeight: isLast ? 500 : 400, lineHeight: 1.2 }}>
                       {segment}
                     </Button>
                   )
@@ -152,7 +143,25 @@ export function FilesSectionContent(props: Props) {
           </Box>
         </Box>
         {filterAndViewControls}
-        {viewMode === 'grid' ? renderGridView : renderListView}
+        {!loading && filteredCount === 0 ? (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography sx={{ fontWeight: 600, mb: 1 }}>没有匹配的文件</Typography>
+            <Typography color="text.secondary">尝试更换关键词，或点击“上传文件”创建内容。</Typography>
+          </Box>
+        ) : viewMode === 'grid' ? (
+          renderGridView
+        ) : (
+          renderListView
+        )}
+      </Box>
+    )
+  }
+
+  if (!loading && filteredCount === 0) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography sx={{ fontWeight: 600, mb: 1 }}>没有匹配的文件</Typography>
+        <Typography color="text.secondary">尝试更换关键词，或点击“上传文件”创建内容。</Typography>
       </Box>
     )
   }

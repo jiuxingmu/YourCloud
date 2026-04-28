@@ -17,14 +17,27 @@ type FileService struct {
 	Storage storage.Provider
 }
 
-func (s FileService) Upload(ownerID uint, fh *multipart.FileHeader) (*model.File, error) {
+func normalizePath(path string) string {
+	return strings.Trim(strings.ReplaceAll(path, "\\", "/"), "/")
+}
+
+func joinFolderAndFilename(folderPath, filename string) string {
+	base := strings.TrimSpace(filename)
+	folder := normalizePath(folderPath)
+	if folder == "" {
+		return base
+	}
+	return folder + "/" + base
+}
+
+func (s FileService) Upload(ownerID uint, fh *multipart.FileHeader, folderPath string) (*model.File, error) {
 	storedPath, size, err := s.Storage.Save(fh)
 	if err != nil {
 		return nil, err
 	}
 	f := &model.File{
 		OwnerID:    ownerID,
-		Filename:   fh.Filename,
+		Filename:   joinFolderAndFilename(folderPath, fh.Filename),
 		StoredPath: storedPath,
 		Size:       size,
 		MimeType:   fh.Header.Get("Content-Type"),
@@ -51,6 +64,9 @@ func (s FileService) DeleteByOwner(ownerID, fileID uint) error {
 	if err := s.Files.DeleteByIDForOwner(fileID, ownerID); err != nil {
 		return err
 	}
+	if f.MimeType == "inode/directory" {
+		return nil
+	}
 	if err := s.Storage.Delete(f.StoredPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
@@ -71,6 +87,25 @@ func (s FileService) MoveByOwner(ownerID, fileID uint, nextFilename string) (*mo
 	return s.Files.FindByIDForOwner(fileID, ownerID)
 }
 
-func (s FileService) CreateFolder(_ uint, folderPath string) error {
-	return s.Storage.CreateFolder(folderPath)
+func (s FileService) CreateFolder(ownerID uint, folderPath string) error {
+	path := normalizePath(folderPath)
+	if path == "" {
+		return gorm.ErrInvalidData
+	}
+	if err := s.Storage.CreateFolder(path); err != nil {
+		return err
+	}
+	if _, err := s.Files.FindByFilenameForOwner(path, ownerID); err == nil {
+		return nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	f := &model.File{
+		OwnerID:    ownerID,
+		Filename:   path,
+		StoredPath: path,
+		Size:       0,
+		MimeType:   "inode/directory",
+	}
+	return s.Files.Create(f)
 }

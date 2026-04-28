@@ -1,5 +1,5 @@
 import type { ChangeEvent, Dispatch, MouseEvent, SetStateAction } from 'react'
-import { Alert, Box, Button, IconButton, Paper, Snackbar, Stack, TextField, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Button, Paper, Snackbar, Stack, Typography } from '@mui/material'
 import { FilesDialogs } from '../features/files/components/FilesDialogs'
 import { FilesFilterBar } from '../features/files/components/FilesFilterBar'
 import { FilesGrid } from '../features/files/components/FilesGrid'
@@ -7,7 +7,7 @@ import { FilesListTable } from '../features/files/components/FilesListTable'
 import { FileActionMenu, FileFilterMenu } from '../features/files/components/FilesMenus'
 import { FilesSectionContent } from '../features/files/components/FilesSectionContent'
 import type { DeletedItem, FileItem, FileSection, TimeFilter, TypeFilter } from '../features/files/domain'
-import { CopyIcon, FolderPlusIcon, RefreshLineIcon, UploadIcon } from '../shared/icons/YourCloudIcons'
+import { FolderPlusIcon, RefreshLineIcon, UploadIcon } from '../shared/icons/YourCloudIcons'
 
 type FeedbackState = { type: 'success' | 'error'; text: string } | null
 type FilterMenu = 'type' | 'time' | null
@@ -16,18 +16,29 @@ type ViewMode = 'grid' | 'list'
 type FileActionsViewModel = {
   downloadingId: number | null
   shareLink: string
+  shareToken: string
+  shareQrUrl: string
+  shareCreating: boolean
+  shareExpiresAt: string | null
+  shareDialogOpen: boolean
+  shareExpireDays: number
+  shareExtractCode: string
+  shareSourceFile: FileItem | null
   actionAnchor: null | HTMLElement
   actionFile: FileItem | null
   folderDialogOpen: boolean
   folderPathInput: string
   moveDialogOpen: boolean
-  moveFilenameInput: string
+  moveTargetFolderPath: string
   deleteDialogOpen: boolean
   deleteTargetFile: FileItem | null
+  setShareDialogOpen: (open: boolean) => void
+  setShareExpireDays: (value: number) => void
+  setShareExtractCode: (value: string) => void
   setFolderDialogOpen: (open: boolean) => void
   setFolderPathInput: (path: string) => void
   setMoveDialogOpen: (open: boolean) => void
-  setMoveFilenameInput: (path: string) => void
+  setMoveTargetFolderPath: (path: string) => void
   setDeleteDialogOpen: (open: boolean) => void
   openActionMenu: (event: MouseEvent<HTMLElement>, file: FileItem) => void
   closeActionMenu: () => void
@@ -37,7 +48,8 @@ type FileActionsViewModel = {
   confirmMoveFile: () => Promise<void>
   confirmCreateFolder: () => Promise<void>
   toggleStar: (file: FileItem) => void
-  createFileShare: (file: FileItem) => Promise<void>
+  requestShareFile: (file: FileItem) => void
+  createFileShare: () => Promise<void>
   copyShareLink: () => Promise<void>
   download: (file: FileItem) => Promise<void>
 }
@@ -71,6 +83,7 @@ type Props = {
   closeFilterMenu: () => void
   setTypeFilter: Dispatch<SetStateAction<TypeFilter>>
   setTimeFilter: Dispatch<SetStateAction<TimeFilter>>
+  moveFolderOptions: string[]
 }
 
 export default function FilesPageView(props: Props) {
@@ -103,6 +116,7 @@ export default function FilesPageView(props: Props) {
     closeFilterMenu,
     setTypeFilter,
     setTimeFilter,
+    moveFolderOptions,
   } = props
 
   const filterAndViewControls = (
@@ -123,7 +137,7 @@ export default function FilesPageView(props: Props) {
       recentGroups={recentGroups}
       downloadingId={actions.downloadingId}
       onDownload={actions.download}
-      onShare={actions.createFileShare}
+      onShare={actions.requestShareFile}
       onOpenMenu={actions.openActionMenu}
       onOpenFolder={openFolder}
     />
@@ -136,7 +150,7 @@ export default function FilesPageView(props: Props) {
       downloadingId={actions.downloadingId}
       onOpenFolder={openFolder}
       onDownload={actions.download}
-      onShare={actions.createFileShare}
+      onShare={actions.requestShareFile}
       onOpenMenu={actions.openActionMenu}
     />
   )
@@ -150,7 +164,7 @@ export default function FilesPageView(props: Props) {
               {shouldShowCreateActions(section) && (
                 <>
                   <Button variant="contained" startIcon={<UploadIcon />} component="label" sx={{ borderRadius: 0, px: 2.5 }}>
-                    新建文件
+                    上传文件
                     <input hidden type="file" onChange={handleUploadChange} />
                   </Button>
                   <Button variant="outlined" startIcon={<FolderPlusIcon />} onClick={() => actions.setFolderDialogOpen(true)}>
@@ -188,17 +202,6 @@ export default function FilesPageView(props: Props) {
           shouldUseTopRightViewSwitch={shouldUseTopRightViewSwitch}
           setViewMode={setViewMode}
         />
-
-        {actions.shareLink && (
-          <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-            <TextField size="small" fullWidth value={actions.shareLink} slotProps={{ htmlInput: { readOnly: true } }} />
-            <Tooltip title="复制链接">
-              <IconButton aria-label="复制分享链接" onClick={() => void actions.copyShareLink()}>
-                <CopyIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        )}
       </Paper>
 
       <FileActionMenu
@@ -218,14 +221,29 @@ export default function FilesPageView(props: Props) {
         setFolderPathInput={actions.setFolderPathInput}
         onConfirmCreateFolder={() => void actions.confirmCreateFolder()}
         moveDialogOpen={actions.moveDialogOpen}
-        moveFilenameInput={actions.moveFilenameInput}
+        moveTargetFolderPath={actions.moveTargetFolderPath}
+        moveFolderOptions={moveFolderOptions}
         setMoveDialogOpen={actions.setMoveDialogOpen}
-        setMoveFilenameInput={actions.setMoveFilenameInput}
+        setMoveTargetFolderPath={actions.setMoveTargetFolderPath}
         onConfirmMove={() => void actions.confirmMoveFile()}
         deleteDialogOpen={actions.deleteDialogOpen}
         deleteTargetFile={actions.deleteTargetFile}
         setDeleteDialogOpen={actions.setDeleteDialogOpen}
         onConfirmDelete={() => void actions.confirmDeleteFile()}
+        shareDialogOpen={actions.shareDialogOpen}
+        shareSourceFile={actions.shareSourceFile}
+        shareExpireDays={actions.shareExpireDays}
+        setShareExpireDays={actions.setShareExpireDays}
+        shareExtractCode={actions.shareExtractCode}
+        setShareExtractCode={actions.setShareExtractCode}
+        shareLink={actions.shareLink}
+        shareToken={actions.shareToken}
+        shareQrUrl={actions.shareQrUrl}
+        shareCreating={actions.shareCreating}
+        shareExpiresAt={actions.shareExpiresAt}
+        setShareDialogOpen={actions.setShareDialogOpen}
+        onConfirmCreateShare={() => void actions.createFileShare()}
+        onCopyShareLink={() => void actions.copyShareLink()}
       />
       <Snackbar open={Boolean(feedback)} autoHideDuration={4000} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         {feedback ? (

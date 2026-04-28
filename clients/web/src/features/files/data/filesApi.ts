@@ -27,9 +27,10 @@ export async function listFiles(): Promise<FileItem[]> {
   return await request<FileItem[]>('/api/v1/files', { headers: { ...authHeaders() } })
 }
 
-export async function uploadFile(file: File): Promise<FileItem> {
+export async function uploadFile(file: File, folderPath = ''): Promise<FileItem> {
   const form = new FormData()
   form.append('file', file)
+  form.append('path', folderPath)
   return await request<FileItem>('/api/v1/files', { method: 'POST', headers: { ...authHeaders() }, body: form })
 }
 
@@ -49,15 +50,15 @@ export async function createFolder(filename: string): Promise<FileItem> {
   return await request<FileItem>('/api/v1/files/folders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ filename }),
+    body: JSON.stringify({ path: filename }),
   })
 }
 
-export async function createShare(fileId: number, expireHours = 24): Promise<{ url: string }> {
-  return await request<{ url: string }>('/api/v1/shares', {
+export async function createShare(fileId: number, expireHours = 72, extractCode = ''): Promise<{ token: string; url: string; expiresAt?: string; extractCode?: string }> {
+  return await request<{ token: string; url: string; expiresAt?: string; extractCode?: string }>('/api/v1/shares', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ fileId, expireHours }),
+    body: JSON.stringify({ fileId, expireHours, extractCode }),
   })
 }
 

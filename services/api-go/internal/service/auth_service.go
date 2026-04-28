@@ -52,3 +52,7 @@ func (s AuthService) Login(email, password string) (string, *model.User, error) 
 	}
 	return signed, u, nil
 }
+
+func (s AuthService) GetUserByID(id uint) (*model.User, error) {
+	return s.Users.FindByID(id)
+}

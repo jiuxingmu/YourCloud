@@ -3,16 +3,20 @@ import {
   AppBar,
   Avatar,
   Box,
+  ClickAwayListener,
   Button,
   CssBaseline,
   IconButton,
   InputAdornment,
+  ListItem,
   List,
+  ListItemText,
   Menu,
   MenuItem,
+  Paper,
+  Popper,
   ListItemButton,
   ListItemIcon,
-  ListItemText,
   LinearProgress,
   Snackbar,
   TextField,
@@ -21,6 +25,7 @@ import {
   Alert,
 } from '@mui/material'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
+import ArrowDropDownRoundedIcon from '@mui/icons-material/ArrowDropDownRounded'
 import { authHeaders, request } from './apiClient'
 import { emitStarredCleared, emitTrashCleared, onFilesChanged } from './features/files/data/filesEvents'
 import { clearDeletedItems, clearSearchHistory, clearStarredIds, readSearchHistory, writeSearchHistory } from './features/files/data/filesStorage'
@@ -44,6 +49,25 @@ export function getShareTokenFromLocation(pathname: string, search: string): str
 
 export function isShareRoute(pathname: string): boolean {
   return /^\/share(?:\/|$)/.test(pathname)
+}
+
+type CurrentUser = { id: number; email: string }
+
+export function displayNameFromEmail(email: string): string {
+  const localPart = email.split('@')[0] || ''
+  const normalized = localPart.replace(/[._-]+/g, ' ').trim()
+  if (!normalized) return 'YourCloud 用户'
+  return normalized
+    .split(/\s+/)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+export function avatarTextFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'YC'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase()
 }
 
 const theme = createTheme({
@@ -87,11 +111,16 @@ export default function App() {
   const [activeNav, setActiveNav] = useState<'home' | 'drive' | 'recent' | 'starred' | 'trash'>('home')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHistory, setSearchHistory] = useState<string[]>(() => readSearchHistory())
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchAnchorEl, setSearchAnchorEl] = useState<HTMLDivElement | null>(null)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [avatarAnchor, setAvatarAnchor] = useState<null | HTMLElement>(null)
   const [settingsAnchor, setSettingsAnchor] = useState<null | HTMLElement>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [usedBytes, setUsedBytes] = useState(0)
   const totalBytes = 15 * 1024 * 1024 * 1024
+  const shouldRenderSharePage = shareRoute || !!shareToken
+  const shouldRenderShell = shouldRenderSharePage || loggedIn
 
   function logout() {
     localStorage.removeItem('token')
@@ -117,14 +146,37 @@ export default function App() {
   }, [loggedIn, shareToken])
 
   useEffect(() => {
+    if (!loggedIn || shouldRenderSharePage) {
+      setCurrentUser(null)
+      return
+    }
+
+    let cancelled = false
+    async function loadCurrentUser() {
+      try {
+        const me = await request<CurrentUser>('/api/v1/auth/me', { headers: { ...authHeaders() } })
+        if (!cancelled) setCurrentUser(me)
+      } catch {
+        if (!cancelled) setCurrentUser(null)
+      }
+    }
+
+    void loadCurrentUser()
+    return () => {
+      cancelled = true
+    }
+  }, [loggedIn, shouldRenderSharePage])
+
+  useEffect(() => {
     function handleFilesChanged() {
       void refreshStorageUsage()
     }
     return onFilesChanged(handleFilesChanged as EventListener)
   }, [loggedIn, shareToken])
 
-  const shouldRenderSharePage = shareRoute || !!shareToken
-  const shouldRenderShell = shouldRenderSharePage || loggedIn
+  const resolvedName = currentUser?.email ? displayNameFromEmail(currentUser.email) : 'YourCloud 用户'
+  const resolvedEmail = currentUser?.email || 'unknown@yourcloud.app'
+  const resolvedAvatar = avatarTextFromName(resolvedName)
   const navItems: Array<{ id: 'home' | 'drive' | 'recent' | 'starred' | 'trash'; label: string; icon: JSX.Element }> = [
     { id: 'home', label: '首页', icon: <HomeIcon fontSize="small" /> },
     { id: 'drive', label: '我的云硬盘', icon: <DriveIcon fontSize="small" /> },
@@ -145,6 +197,12 @@ export default function App() {
     persistHistory(next)
   }
 
+  const filteredSearchHistory = useMemo(() => {
+    const normalized = searchQuery.trim().toLowerCase()
+    if (!normalized) return searchHistory.slice(0, 8)
+    return searchHistory.filter((item) => item.toLowerCase().includes(normalized)).slice(0, 8)
+  }, [searchHistory, searchQuery])
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -159,44 +217,77 @@ export default function App() {
                   </Typography>
                 </Box>
                 <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') pushSearchHistory(searchQuery)
-                    }}
-                    placeholder="在云端硬盘中搜索"
-                    autoComplete="off"
-                    name="file-search"
-                    sx={{
-                      maxWidth: 680,
-                    '& .MuiOutlinedInput-root': {
-                        borderRadius: 0,
-                        bgcolor: '#e9eef6',
-                        minHeight: 44,
-                        '& fieldset': { borderColor: 'transparent' },
-                        '&:hover fieldset': { borderColor: '#d2d6dc' },
-                        '&.Mui-focused fieldset': { borderColor: '#c4c7cc' },
-                      },
-                    }}
-                    slotProps={{
-                      htmlInput: { list: 'search-history-list' },
-                      input: {
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchLineIcon fontSize="small" />
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                  />
-                  <datalist id="search-history-list">
-                    {searchHistory.map((item) => (
-                      <option key={item} value={item} />
-                    ))}
-                  </datalist>
+                  <ClickAwayListener onClickAway={() => setSearchOpen(false)}>
+                    <Box ref={setSearchAnchorEl} sx={{ width: '100%', maxWidth: 680 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        value={searchQuery}
+                        onFocus={() => setSearchOpen(true)}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value)
+                          setSearchOpen(true)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            pushSearchHistory(searchQuery)
+                            setSearchOpen(false)
+                          }
+                          if (e.key === 'Escape') setSearchOpen(false)
+                        }}
+                        placeholder="在云端硬盘中搜索"
+                        autoComplete="off"
+                        name="file-search"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 3,
+                            bgcolor: '#edf2fb',
+                            minHeight: 46,
+                            transition: 'all .16s ease',
+                            '& fieldset': { borderColor: '#d7deea' },
+                            '&:hover': { bgcolor: '#e9effa' },
+                            '&:hover fieldset': { borderColor: '#c7d2e6' },
+                            '&.Mui-focused': { bgcolor: '#fff', boxShadow: '0 2px 10px rgba(26,115,232,0.14)' },
+                            '&.Mui-focused fieldset': { borderColor: '#90b4f5' },
+                          },
+                        }}
+                        slotProps={{
+                          input: {
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <SearchLineIcon fontSize="small" />
+                              </InputAdornment>
+                            ),
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <ArrowDropDownRoundedIcon sx={{ color: '#5f6368' }} />
+                              </InputAdornment>
+                            ),
+                          },
+                        }}
+                      />
+                      <Popper open={searchOpen && filteredSearchHistory.length > 0} anchorEl={searchAnchorEl} placement="bottom-start" sx={{ zIndex: 1301, width: searchAnchorEl?.clientWidth }}>
+                        <Paper elevation={0} sx={{ mt: 0.75, border: '1px solid #dfe3eb', borderRadius: 2, overflow: 'hidden', boxShadow: '0 6px 22px rgba(15,23,42,0.12)' }}>
+                          <List dense disablePadding>
+                            {filteredSearchHistory.map((item) => (
+                              <ListItem key={item} disablePadding>
+                                <ListItemButton
+                                  onClick={() => {
+                                    setSearchQuery(item)
+                                    pushSearchHistory(item)
+                                    setSearchOpen(false)
+                                  }}
+                                  sx={{ minHeight: 42 }}
+                                >
+                                  <ListItemText primary={item} />
+                                </ListItemButton>
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Paper>
+                      </Popper>
+                    </Box>
+                  </ClickAwayListener>
                 </Box>
                 <Box sx={{ width: 220, ml: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5 }}>
                   <IconButton size="small" aria-label="打开设置菜单" onClick={(e) => setSettingsAnchor(e.currentTarget)}>
@@ -208,7 +299,7 @@ export default function App() {
                     </Button>
                   )}
                   <IconButton size="small" aria-label="打开账号菜单" onClick={(e) => setAvatarAnchor(e.currentTarget)}>
-                    <Avatar sx={{ width: 30, height: 30, fontSize: 14, bgcolor: '#5f72c8' }}>Wu</Avatar>
+                    <Avatar sx={{ width: 30, height: 30, fontSize: 14, bgcolor: '#5f72c8' }}>{resolvedAvatar}</Avatar>
                   </IconButton>
                 </Box>
               </Toolbar>
@@ -297,11 +388,11 @@ export default function App() {
             >
               <Box sx={{ px: 1.5, py: 1 }}>
                 <Box sx={{ display: 'flex', gap: 1.2, alignItems: 'center' }}>
-                  <Avatar sx={{ width: 36, height: 36, bgcolor: '#5f72c8' }}>Wu</Avatar>
+                  <Avatar sx={{ width: 36, height: 36, bgcolor: '#5f72c8' }}>{resolvedAvatar}</Avatar>
                   <Box>
-                    <Typography sx={{ fontWeight: 600, fontSize: 14 }}>Xuegao Wu</Typography>
+                    <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{resolvedName}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      wu@yourcloud.app
+                      {resolvedEmail}
                     </Typography>
                   </Box>
                 </Box>
