@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type ChangeEvent, type MouseEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from 'react'
 import {
   Alert,
   Box,
@@ -26,7 +26,7 @@ import {
   Tooltip,
   TextField,
 } from '@mui/material'
-import { authHeaders, request } from '../apiClient'
+import { authHeaders, request, toUserFriendlyErrorMessage } from '../apiClient'
 import FilePreview from '../components/FilePreview'
 
 type FileItem = { id: number; filename: string; size: number; mimeType?: string; updatedAt?: string; createdAt?: string }
@@ -35,6 +35,40 @@ type Section = 'home' | 'drive' | 'recent' | 'starred' | 'trash'
 type Props = { searchQuery?: string; section?: Section }
 type TypeFilter = 'all' | 'doc' | 'sheet' | 'slide' | 'image' | 'pdf' | 'video' | 'archive' | 'audio'
 type TimeFilter = 'all' | 'today' | '7d' | '30d' | 'thisYear' | 'lastYear'
+
+export function shouldShowCreateActions(section: Section): boolean {
+  return section !== 'home' && section !== 'trash'
+}
+
+export function getDeleteDialogTitle(file: FileItem | null): string {
+  return file?.mimeType === 'inode/directory' ? '删除文件夹' : '删除文件'
+}
+
+export function getDeleteDialogDescription(file: FileItem | null): string {
+  const target = file ? getBaseName(file.filename) || file.filename : ''
+  if (!target) return '确认删除吗？删除后不可恢复。'
+  if (file?.mimeType === 'inode/directory') return `确认删除文件夹「${target}」吗？删除后不可恢复。`
+  return `确认删除文件「${target}」吗？删除后不可恢复。`
+}
+
+export function getDeleteFeedbackText(file: FileItem): string {
+  const target = getBaseName(file.filename) || file.filename
+  if (file.mimeType === 'inode/directory') return `已删除文件夹：「${target}」`
+  return `已删除文件：「${target}」`
+}
+
+export function getTrashClearFeedbackText(deletedItems: DeletedItem[]): string {
+  return deletedItems.length > 0 ? '已清空回收站记录' : '当前无可清空内容'
+}
+
+export function canDownloadFile(file: FileItem): boolean {
+  return file.id > 0 && file.mimeType !== 'inode/directory'
+}
+
+export function formatDisplayFileSize(file: FileItem): string {
+  if (file.mimeType === 'inode/directory') return '-'
+  return formatFileSize(file.size)
+}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -63,6 +97,114 @@ function getRelativeBucket(value?: string): 'today' | 'lastMonth' | 'earlier' {
   const monthDiff = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth())
   if (monthDiff <= 1) return 'lastMonth'
   return 'earlier'
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
+}
+
+function getBaseName(path: string): string {
+  const normalized = normalizePath(path)
+  const idx = normalized.lastIndexOf('/')
+  return idx > -1 ? normalized.slice(idx + 1) : normalized
+}
+
+function getParentPath(path: string): string {
+  const normalized = normalizePath(path)
+  const idx = normalized.lastIndexOf('/')
+  return idx > -1 ? normalized.slice(0, idx) : ''
+}
+
+function isDirectoryItem(file: FileItem): boolean {
+  return file.mimeType === 'inode/directory'
+}
+
+export function deriveDriveItems(files: FileItem[], currentPath: string): FileItem[] {
+  const folderByPath = new Map<string, FileItem>()
+  const directFiles: FileItem[] = []
+  const syntheticFolderPaths = new Set<string>()
+  const normalizedCurrent = normalizePath(currentPath)
+
+  for (const file of files) {
+    const full = normalizePath(file.filename)
+    if (!full) continue
+    if (file.mimeType === 'inode/directory') {
+      folderByPath.set(full, file)
+    }
+  }
+
+  for (const file of files) {
+    const full = normalizePath(file.filename)
+    if (!full) continue
+    const parent = getParentPath(full)
+    const isFolder = file.mimeType === 'inode/directory'
+
+    if (normalizedCurrent === '') {
+      if (!full.includes('/')) {
+        directFiles.push(file)
+      } else {
+        syntheticFolderPaths.add(full.split('/')[0])
+      }
+      continue
+    }
+
+    const prefix = `${normalizedCurrent}/`
+    if (!full.startsWith(prefix)) continue
+    const rest = full.slice(prefix.length)
+    if (!rest) continue
+
+    if (rest.includes('/')) {
+      syntheticFolderPaths.add(`${normalizedCurrent}/${rest.split('/')[0]}`)
+      continue
+    }
+
+    if (parent === normalizedCurrent || (isFolder && full === `${normalizedCurrent}/${rest}`)) {
+      directFiles.push(file)
+    }
+  }
+
+  const syntheticFolders: FileItem[] = Array.from(syntheticFolderPaths)
+    .filter((folderPath) => getParentPath(folderPath) === normalizedCurrent)
+    .map((folderPath) => {
+      const real = folderByPath.get(folderPath)
+      if (real) return real
+      const now = new Date().toISOString()
+      return {
+        id: -Math.abs(
+          Array.from(folderPath).reduce((sum, ch) => {
+            return (sum * 31 + ch.charCodeAt(0)) | 0
+          }, 0),
+        ),
+        filename: folderPath,
+        size: 0,
+        mimeType: 'inode/directory',
+        createdAt: now,
+        updatedAt: now,
+      } satisfies FileItem
+    })
+
+  const merged = [...syntheticFolders, ...directFiles]
+  const uniqueByPath = new Map<string, FileItem>()
+  for (const item of merged) {
+    const key = normalizePath(item.filename)
+    if (!uniqueByPath.has(key)) uniqueByPath.set(key, item)
+  }
+
+  return Array.from(uniqueByPath.values()).sort((a, b) => {
+    const aFolder = a.mimeType === 'inode/directory'
+    const bFolder = b.mimeType === 'inode/directory'
+    if (aFolder !== bFolder) return aFolder ? -1 : 1
+    return getBaseName(a.filename).localeCompare(getBaseName(b.filename), 'zh-CN')
+  })
+}
+
+export function mergeVirtualAndRemoteFiles(virtualFolders: FileItem[], remoteFiles: FileItem[]): FileItem[] {
+  const remoteByPath = new Map<string, FileItem>()
+  for (const remote of remoteFiles) {
+    remoteByPath.set(normalizePath(remote.filename), remote)
+  }
+  const optimisticVirtuals = virtualFolders.filter((folder) => !remoteByPath.has(normalizePath(folder.filename)))
+  return [...optimisticVirtuals, ...remoteFiles]
 }
 
 function CopyIcon(props: SvgIconProps) {
@@ -177,9 +319,80 @@ function ArrowDownIcon(props: SvgIconProps) {
   )
 }
 
+function ImageIcon(props: SvgIconProps) {
+  return (
+    <SvgIcon {...props} viewBox="0 0 24 24">
+      <path d="M5 5h14v14H5zm2 10 2.8-3.2 2.2 2.4 3-3.6L17 15zM9 9a1.5 1.5 0 1 0 .001-2.999A1.5 1.5 0 0 0 9 9z" />
+    </SvgIcon>
+  )
+}
+
+function PdfIcon(props: SvgIconProps) {
+  return (
+    <SvgIcon {...props} viewBox="0 0 24 24">
+      <path d="M6 3h8l4 4v14H6zm8 1.5V8h3.5zM8 16h2.5a2 2 0 0 0 0-4H8zm2 0H9v-2h1a1 1 0 1 1 0 2zm2-4h2.5a1.5 1.5 0 0 1 0 3H13v1h-1zm1 1v1h1.2a.5.5 0 1 0 0-1z" />
+    </SvgIcon>
+  )
+}
+
+function VideoIcon(props: SvgIconProps) {
+  return (
+    <SvgIcon {...props} viewBox="0 0 24 24">
+      <path d="M5 6h10a2 2 0 0 1 2 2v1.5L20 8v8l-3-1.5V16a2 2 0 0 1-2 2H5zM10 10v4l3-2z" />
+    </SvgIcon>
+  )
+}
+
+function AudioIcon(props: SvgIconProps) {
+  return (
+    <SvgIcon {...props} viewBox="0 0 24 24">
+      <path d="M14 5v9.2a3 3 0 1 1-2-2.83V7h7V5z" />
+    </SvgIcon>
+  )
+}
+
+function ArchiveIcon(props: SvgIconProps) {
+  return (
+    <SvgIcon {...props} viewBox="0 0 24 24">
+      <path d="M5 4h14v4H5zm1 5h12v11H6zm4 2v2h4v-2zm0 3v2h4v-2z" />
+    </SvgIcon>
+  )
+}
+
+function FolderIcon(props: SvgIconProps) {
+  return (
+    <SvgIcon {...props} viewBox="0 0 24 24">
+      <path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </SvgIcon>
+  )
+}
+
+function resolveFileVisual(file: FileItem): { icon: (props: SvgIconProps) => JSX.Element; color: string; bg: string } {
+  const name = file.filename.toLowerCase()
+  const mime = (file.mimeType || '').toLowerCase()
+  if (file.mimeType === 'inode/directory') return { icon: FolderIcon, color: '#b26a00', bg: '#fff4d6' }
+  if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(name)) return { icon: ImageIcon, color: '#0061c9', bg: '#e7f0ff' }
+  if (mime === 'application/pdf' || name.endsWith('.pdf')) return { icon: PdfIcon, color: '#b3261e', bg: '#fdecea' }
+  if (mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/.test(name)) return { icon: VideoIcon, color: '#6a1b9a', bg: '#f2e7fe' }
+  if (mime.startsWith('audio/') || /\.(mp3|wav|aac|flac|ogg)$/.test(name)) return { icon: AudioIcon, color: '#1b5e20', bg: '#e6f4ea' }
+  if (/\.(zip|rar|7z|tar|gz)$/.test(name)) return { icon: ArchiveIcon, color: '#37474f', bg: '#eceff1' }
+  return { icon: FileIcon, color: '#5f6368', bg: '#edf2fa' }
+}
+
+function FileTypeBadge({ file, size = 18 }: { file: FileItem; size?: number }) {
+  const visual = resolveFileVisual(file)
+  const IconComp = visual.icon
+  return (
+    <Box sx={{ width: size + 8, height: size + 8, borderRadius: 1, bgcolor: visual.bg, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+      <IconComp sx={{ fontSize: size, color: visual.color }} />
+    </Box>
+  )
+}
+
 export default function FilesPage({ searchQuery = '', section = 'home' }: Props) {
   const [files, setFiles] = useState<FileItem[]>([])
   const [virtualFolders, setVirtualFolders] = useState<FileItem[]>([])
+  const virtualFoldersRef = useRef<FileItem[]>([])
   const [starredIds, setStarredIds] = useState<number[]>(() => {
     try {
       const raw = localStorage.getItem('starred_file_ids')
@@ -210,6 +423,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
   const [moveTargetFile, setMoveTargetFile] = useState<FileItem | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTargetFile, setDeleteTargetFile] = useState<FileItem | null>(null)
+  const [currentDrivePath, setCurrentDrivePath] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all')
   const [filterMenu, setFilterMenu] = useState<'type' | 'time' | null>(null)
@@ -217,7 +431,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
   const normalizedQuery = searchQuery.trim().toLowerCase()
 
   const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
-  const dialogPaperSx = { borderRadius: 0, border: '1px solid #dfe3e8' }
+  const dialogPaperSx = { borderRadius: 0, border: '1px solid #dfe3e8', minWidth: 560 }
 
   function showFeedback(type: 'success' | 'error', text: string) {
     setFeedback({ type, text })
@@ -237,16 +451,27 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
     setLoading(true)
     try {
       const nextFiles = await request<FileItem[]>('/api/v1/files', { headers: { ...authHeaders() } })
-      setFiles([...virtualFolders, ...nextFiles])
+      setFiles(mergeVirtualAndRemoteFiles(virtualFoldersRef.current, nextFiles))
     } catch (e) {
-      showFeedback('error', (e as Error).message)
+      showFeedback('error', toUserFriendlyErrorMessage(e, 'files'))
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    load()
+    void load()
+  }, [])
+
+  useEffect(() => {
+    virtualFoldersRef.current = virtualFolders
+  }, [virtualFolders])
+
+  useEffect(() => {
+    setFiles((prev) => {
+      const nonVirtual = prev.filter((item) => !virtualFolders.some((vf) => vf.id === item.id))
+      return [...virtualFolders, ...nonVirtual]
+    })
   }, [virtualFolders])
 
   useEffect(() => {
@@ -264,16 +489,20 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
     }
   }, [])
 
+  useEffect(() => {
+    if (section !== 'drive') setCurrentDrivePath('')
+  }, [section])
+
   async function upload(file: File) {
     const form = new FormData()
     form.append('file', file)
     try {
       await request('/api/v1/files', { method: 'POST', headers: { ...authHeaders() }, body: form })
-      showFeedback('success', 'Upload success.')
+      showFeedback('success', '上传成功。')
       await load()
       window.dispatchEvent(new CustomEvent('yourcloud:files-changed'))
     } catch (e) {
-      showFeedback('error', (e as Error).message)
+      showFeedback('error', toUserFriendlyErrorMessage(e, 'files'))
     }
   }
 
@@ -301,7 +530,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
       setShareLink(link)
       showFeedback('success', `已创建分享链接：${file.filename}`)
     } catch (e) {
-      showFeedback('error', (e as Error).message)
+      showFeedback('error', toUserFriendlyErrorMessage(e, 'files'))
     }
   }
 
@@ -309,15 +538,15 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
     if (!shareLink) return
     try {
       await navigator.clipboard.writeText(shareLink)
-      showFeedback('success', 'Share link copied.')
+      showFeedback('success', '分享链接已复制。')
     } catch {
-      showFeedback('error', 'Failed to copy share link. Please copy it manually.')
+      showFeedback('error', '复制分享链接失败，请手动复制。')
     }
   }
 
   async function downloadFile(file: FileItem) {
-    if (file.mimeType === 'inode/directory') {
-      showFeedback('error', '文件夹暂不支持下载')
+    if (!canDownloadFile(file)) {
+      showFeedback('error', '当前项目不支持下载')
       return
     }
     setDownloadingId(file.id)
@@ -326,7 +555,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
         headers: { ...authHeaders() },
       })
       if (!res.ok) {
-        throw new Error(`Download failed: ${res.status}`)
+        throw new Error('下载失败')
       }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -339,9 +568,9 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
       window.setTimeout(() => {
         URL.revokeObjectURL(url)
       }, 1000)
-      showFeedback('success', 'Download started.')
+      showFeedback('success', '已开始下载。')
     } catch (e) {
-      showFeedback('error', (e as Error).message)
+      showFeedback('error', toUserFriendlyErrorMessage(e, 'files'))
     } finally {
       setDownloadingId(null)
     }
@@ -368,7 +597,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
     if (file.mimeType === 'inode/directory') {
       setVirtualFolders((prev) => prev.filter((f) => f.id !== file.id))
       setFiles((prev) => prev.filter((f) => f.id !== file.id))
-      showFeedback('success', `已删除文件夹：${file.filename}`)
+      showFeedback('success', getDeleteFeedbackText(file))
       setDeleteDialogOpen(false)
       setDeleteTargetFile(null)
       return
@@ -378,12 +607,12 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
         method: 'DELETE',
         headers: { ...authHeaders() },
       })
-      showFeedback('success', `已删除：${file.filename}`)
+      showFeedback('success', getDeleteFeedbackText(file))
       persistDeleted([{ id: file.id, filename: file.filename, deletedAt: new Date().toISOString() }, ...deletedItems].slice(0, 50))
       await load()
       window.dispatchEvent(new CustomEvent('yourcloud:files-changed'))
     } catch (e) {
-      showFeedback('error', (e as Error).message)
+      showFeedback('error', toUserFriendlyErrorMessage(e, 'files'))
     } finally {
       setDeleteDialogOpen(false)
       setDeleteTargetFile(null)
@@ -423,7 +652,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
       await load()
       window.dispatchEvent(new CustomEvent('yourcloud:files-changed'))
     } catch (e) {
-      showFeedback('error', (e as Error).message)
+      showFeedback('error', toUserFriendlyErrorMessage(e, 'files'))
     } finally {
       setMoveDialogOpen(false)
       setMoveTargetFile(null)
@@ -452,9 +681,15 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
         createdAt: now,
         updatedAt: now,
       }
-      setVirtualFolders((prev) => [pseudoFolder, ...prev])
+      setVirtualFolders((prev) => {
+        const next = [pseudoFolder, ...prev.filter((item) => normalizePath(item.filename) !== normalizePath(pseudoFolder.filename))]
+        virtualFoldersRef.current = next
+        return next
+      })
+      setFiles((prev) => [pseudoFolder, ...prev.filter((item) => item.id !== pseudoFolder.id)])
+      await load()
     } catch (e) {
-      showFeedback('error', (e as Error).message)
+      showFeedback('error', toUserFriendlyErrorMessage(e, 'files'))
     } finally {
       setFolderDialogOpen(false)
       setFolderPathInput('')
@@ -471,6 +706,11 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
     showFeedback('success', `已加星标：${file.filename}`)
   }
 
+  function openFolder(file: FileItem) {
+    if (!isDirectoryItem(file)) return
+    setCurrentDrivePath(normalizePath(file.filename))
+  }
+
   function openFilterMenu(kind: 'type' | 'time', event: MouseEvent<HTMLElement>) {
     setFilterMenu(kind)
     setFilterAnchor(event.currentTarget)
@@ -482,6 +722,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
   }
 
   function matchesTypeFilter(file: FileItem): boolean {
+    if (file.mimeType === 'inode/directory') return true
     if (typeFilter === 'all') return true
     const name = file.filename.toLowerCase()
     const mime = (file.mimeType || '').toLowerCase()
@@ -515,6 +756,8 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
       ? files.filter((f) => starredIds.includes(f.id))
       : section === 'recent'
         ? [...files].sort((a, b) => +new Date(b.updatedAt ?? b.createdAt ?? 0) - +new Date(a.updatedAt ?? a.createdAt ?? 0))
+        : section === 'drive'
+          ? deriveDriveItems(files, currentDrivePath)
         : files
   const filteredFiles = sectionFiles.filter((file) => {
     if (normalizedQuery && !file.filename.toLowerCase().includes(normalizedQuery)) return false
@@ -529,6 +772,107 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
   }
   const recommendedFiles = [...files].sort((a, b) => +new Date(b.updatedAt ?? b.createdAt ?? 0) - +new Date(a.updatedAt ?? a.createdAt ?? 0)).slice(0, 4)
   const recommendedFolder = files.find((f) => f.filename.includes('/'))?.filename.split('/')[0] || (files[0]?.filename.replace(/\.[^/.]+$/, '') || '示例文件夹')
+  const viewSwitch = (
+    <Box>
+      <IconButton size="small" aria-label="切换为列表视图" color={viewMode === 'list' ? 'primary' : 'default'} onClick={() => setViewMode('list')}>
+        <ListIcon fontSize="small" />
+      </IconButton>
+      <IconButton size="small" aria-label="切换为网格视图" color={viewMode === 'grid' ? 'primary' : 'default'} onClick={() => setViewMode('grid')}>
+        <GridIcon fontSize="small" />
+      </IconButton>
+    </Box>
+  )
+  const unifiedTableSx = {
+    tableLayout: 'fixed',
+    '& .MuiTableCell-root': {
+      px: 1.5,
+      py: 1,
+      whiteSpace: 'nowrap',
+    },
+    '& .MuiTableHead-root .MuiTableCell-root': {
+      fontWeight: 600,
+      color: 'text.secondary',
+      borderBottomColor: '#e6eaf0',
+    },
+  }
+  const headerCellSx = { width: '20%' }
+  function renderRowActions(file: FileItem) {
+    return (
+      <>
+        {canDownloadFile(file) && (
+          <>
+            <Button size="small" onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
+              下载
+            </Button>
+            <Button size="small" onClick={() => createShare(file)}>
+              分享
+            </Button>
+          </>
+        )}
+        <IconButton size="small" aria-label={`打开文件操作菜单：${getBaseName(file.filename)}`} onClick={(e) => openActionMenu(e, file)}>
+          <MoreIcon fontSize="small" />
+        </IconButton>
+      </>
+    )
+  }
+  function renderUnifiedListRows(items: FileItem[], locationLabel = '我的云端硬盘') {
+    return items.map((file) => (
+      <TableRow key={file.id} hover>
+        <TableCell sx={{ maxWidth: 460 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: section === 'drive' && file.mimeType === 'inode/directory' ? 'pointer' : 'default' }}
+            onClick={() => {
+              if (section === 'drive' && file.mimeType === 'inode/directory') openFolder(file)
+            }}
+          >
+            <FileTypeBadge file={file} />
+            <Typography noWrap>{section === 'drive' ? getBaseName(file.filename) : file.filename}</Typography>
+          </Box>
+        </TableCell>
+        <TableCell>{formatModified(file.updatedAt ?? file.createdAt)}</TableCell>
+        <TableCell>{formatDisplayFileSize(file)}</TableCell>
+        <TableCell>{locationLabel}</TableCell>
+        <TableCell align="right">{renderRowActions(file)}</TableCell>
+      </TableRow>
+    ))
+  }
+  const renderListView = (
+    <Table size="small" sx={unifiedTableSx}>
+      <TableHead>
+        <TableRow>
+          <TableCell sx={headerCellSx}>名称</TableCell>
+          <TableCell sx={headerCellSx}>修改时间</TableCell>
+          <TableCell sx={headerCellSx}>文件大小</TableCell>
+          <TableCell sx={headerCellSx}>位置</TableCell>
+          <TableCell sx={headerCellSx} align="right">
+            操作
+          </TableCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {section === 'recent'
+          ? ([
+              ['今天', recentGroups.today],
+              ['上个月', recentGroups.lastMonth],
+              ['更早', recentGroups.earlier],
+            ] as Array<[string, FileItem[]]>).map(([label, group]) => (
+              <Fragment key={label}>
+                {group.length > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5}>
+                      <Typography variant="caption" color="text.secondary">
+                        {label}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {renderUnifiedListRows(group)}
+              </Fragment>
+            ))
+          : renderUnifiedListRows(section === 'home' ? recommendedFiles : filteredFiles)}
+      </TableBody>
+    </Table>
+  )
   const renderGridView = (
     <Box
       sx={{
@@ -566,29 +910,45 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
                 overflow: 'hidden',
               }}
             >
-              <FilePreview id={file.id} filename={file.filename} mimeType={file.mimeType} apiBase={apiBase} lazy />
+              {isDirectoryItem(file) ? (
+                <Box sx={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
+                  <FileTypeBadge file={file} size={32} />
+                </Box>
+              ) : (
+                <FilePreview id={file.id} filename={file.filename} mimeType={file.mimeType} apiBase={apiBase} lazy />
+              )}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-              <FileIcon fontSize="small" sx={{ mt: 0.2, color: 'text.secondary' }} />
+              <FileTypeBadge file={file} />
               <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-                <Typography noWrap sx={{ fontSize: 14, fontWeight: 500 }}>
-                  {file.filename}
+                <Typography
+                  noWrap
+                  sx={{ fontSize: 14, fontWeight: 500, cursor: section === 'drive' && file.mimeType === 'inode/directory' ? 'pointer' : 'default' }}
+                  onClick={() => {
+                    if (section === 'drive' && file.mimeType === 'inode/directory') openFolder(file)
+                  }}
+                >
+                  {section === 'drive' ? getBaseName(file.filename) : file.filename}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {formatFileSize(file.size)}
+                  {formatDisplayFileSize(file)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                   修改于 {formatModified(file.updatedAt ?? file.createdAt)}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                <Button size="small" onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
-                  下载
-                </Button>
-                <Button size="small" onClick={() => createShare(file)}>
-                  分享
-                </Button>
-                <IconButton size="small" onClick={(e) => openActionMenu(e, file)}>
+                {canDownloadFile(file) && (
+                  <>
+                    <Button size="small" onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
+                      下载
+                    </Button>
+                    <Button size="small" onClick={() => createShare(file)}>
+                      分享
+                    </Button>
+                  </>
+                )}
+                <IconButton size="small" aria-label={`打开文件操作菜单：${getBaseName(file.filename)}`} onClick={(e) => openActionMenu(e, file)}>
                   <MoreIcon fontSize="small" />
                 </IconButton>
               </Box>
@@ -603,15 +963,19 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
     <Box sx={{ display: 'grid', gap: 2.5 }}>
       <Paper variant="outlined" sx={{ borderRadius: 0, p: 2, borderColor: '#dfe3e8', backgroundColor: '#fff' }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { xs: 'stretch', sm: 'center' }, mb: 2 }}>
-          {section !== 'home' && (
+          {(section !== 'home' || section === 'trash') && (
             <>
-              <Button variant="contained" startIcon={<UploadIcon />} component="label" sx={{ borderRadius: 0, px: 2.5 }}>
-                新建文件
-                <input hidden type="file" onChange={handleUploadChange} />
-              </Button>
-              <Button variant="outlined" startIcon={<FolderPlusIcon />} onClick={() => setFolderDialogOpen(true)}>
-                新建文件夹
-              </Button>
+              {shouldShowCreateActions(section) && (
+                <>
+                  <Button variant="contained" startIcon={<UploadIcon />} component="label" sx={{ borderRadius: 0, px: 2.5 }}>
+                    新建文件
+                    <input hidden type="file" onChange={handleUploadChange} />
+                  </Button>
+                  <Button variant="outlined" startIcon={<FolderPlusIcon />} onClick={() => setFolderDialogOpen(true)}>
+                    新建文件夹
+                  </Button>
+                </>
+              )}
               <Button variant="outlined" startIcon={<RefreshLineIcon />} onClick={load} disabled={loading}>
                 刷新
               </Button>
@@ -649,54 +1013,9 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                 <Typography sx={{ fontWeight: 600 }}>建议的文件</Typography>
-                <Box>
-                  <IconButton size="small" color={viewMode === 'list' ? 'primary' : 'default'} onClick={() => setViewMode('list')}>
-                    <ListIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" color={viewMode === 'grid' ? 'primary' : 'default'} onClick={() => setViewMode('grid')}>
-                    <GridIcon fontSize="small" />
-                  </IconButton>
-                </Box>
+                {viewSwitch}
               </Box>
-              {viewMode === 'grid' ? (
-                renderGridView
-              ) : (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>名称</TableCell>
-                    <TableCell>建议原因</TableCell>
-                    <TableCell>位置</TableCell>
-                    <TableCell align="right" />
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {recommendedFiles.map((file) => (
-                    <TableRow key={file.id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <FileIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                          <Typography noWrap>{file.filename}</Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>您打开过 · {formatModified(file.updatedAt ?? file.createdAt)}</TableCell>
-                      <TableCell>我的云端硬盘</TableCell>
-                      <TableCell align="right">
-                          <Button size="small" onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
-                            下载
-                          </Button>
-                          <Button size="small" onClick={() => createShare(file)}>
-                            分享
-                          </Button>
-                          <IconButton size="small" onClick={(e) => openActionMenu(e, file)}>
-                            <MoreIcon fontSize="small" />
-                          </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              )}
+              {viewMode === 'grid' ? renderGridView : renderListView}
             </Box>
           </Box>
         ) : !loading && section === 'trash' ? (
@@ -706,8 +1025,9 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
               <Button
                 size="small"
                 onClick={() => {
+                  const message = getTrashClearFeedbackText(deletedItems)
                   persistDeleted([])
-                  showFeedback('success', '已清空回收站记录')
+                  showFeedback('success', message)
                 }}
               >
                 清空记录
@@ -737,142 +1057,47 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
           <Box sx={{ display: 'grid', gap: 2 }}>
             <Typography sx={{ fontSize: 36, fontWeight: 500 }}>最近用过</Typography>
             <Stack direction="row" spacing={1}>
-              <Button size="small" variant="outlined" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('type', e)}>
+              <Button size="small" variant="outlined" aria-label="打开类型筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('type', e)}>
                 类型
               </Button>
-              <Button size="small" variant="outlined" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('time', e)}>
+              <Button size="small" variant="outlined" aria-label="打开修改时间筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('time', e)}>
                 修改时间
               </Button>
-              <Box sx={{ ml: 'auto' }}>
-                <IconButton size="small" color={viewMode === 'list' ? 'primary' : 'default'} onClick={() => setViewMode('list')}>
-                  <ListIcon fontSize="small" />
-                </IconButton>
-                <IconButton size="small" color={viewMode === 'grid' ? 'primary' : 'default'} onClick={() => setViewMode('grid')}>
-                  <GridIcon fontSize="small" />
-                </IconButton>
-              </Box>
+              <Box sx={{ ml: 'auto' }}>{viewSwitch}</Box>
             </Stack>
-            {viewMode === 'grid' ? (
-              renderGridView
-            ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>名称</TableCell>
-                  <TableCell>修改时间</TableCell>
-                  <TableCell>所有者</TableCell>
-                  <TableCell>文件大小</TableCell>
-                  <TableCell>位置</TableCell>
-                  <TableCell align="right" />
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {([
-                  ['今天', recentGroups.today],
-                  ['上个月', recentGroups.lastMonth],
-                  ['更早', recentGroups.earlier],
-                ] as Array<[string, FileItem[]]>).map(([label, group]) => (
-                  <Fragment key={label}>
-                    {group.length > 0 && (
-                      <TableRow>
-                        <TableCell colSpan={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            {label}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    {group.map((file) => (
-                      <TableRow key={file.id} hover>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <FileIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                            <Typography noWrap>{file.filename}</Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell>{formatModified(file.updatedAt ?? file.createdAt)}</TableCell>
-                        <TableCell>我</TableCell>
-                        <TableCell>{formatFileSize(file.size)}</TableCell>
-                        <TableCell>我的云端硬盘</TableCell>
-                        <TableCell align="right">
-                          <Button size="small" onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
-                            下载
-                          </Button>
-                          <Button size="small" onClick={() => createShare(file)}>
-                            分享
-                          </Button>
-                          <IconButton size="small" onClick={(e) => openActionMenu(e, file)}>
-                            <MoreIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </Fragment>
-                ))}
-              </TableBody>
-            </Table>
-            )}
+            {viewMode === 'grid' ? renderGridView : renderListView}
           </Box>
         ) : section === 'drive' ? (
           <Box sx={{ display: 'grid', gap: 2 }}>
-            <Typography sx={{ fontSize: 36, fontWeight: 500 }}>我的云端硬盘</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button size="large" onClick={() => setCurrentDrivePath('')} sx={{ fontSize: 46, fontWeight: 500, px: 0, minWidth: 0, lineHeight: 1 }}>
+                我的云端硬盘
+              </Button>
+              {currentDrivePath && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: 'text.secondary' }}>
+                  <Typography sx={{ fontSize: 40, lineHeight: 1 }}>›</Typography>
+                  {currentDrivePath.split('/').map((segment, idx, arr) => {
+                    const path = arr.slice(0, idx + 1).join('/')
+                    const isLast = idx === arr.length - 1
+                    return (
+                      <Button key={path} size="large" onClick={() => setCurrentDrivePath(path)} disabled={isLast} sx={{ px: 0.5, minWidth: 0, fontSize: 40, fontWeight: isLast ? 500 : 400, lineHeight: 1 }}>
+                        {segment}
+                      </Button>
+                    )
+                  })}
+                </Box>
+              )}
+            </Box>
             <Stack direction="row" spacing={1}>
-              <Button size="small" variant="outlined" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('type', e)}>
+              <Button size="small" variant="outlined" aria-label="打开类型筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('type', e)}>
                 类型
               </Button>
-              <Button size="small" variant="outlined" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('time', e)}>
+              <Button size="small" variant="outlined" aria-label="打开修改时间筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('time', e)}>
                 修改时间
               </Button>
-              <Box sx={{ ml: 'auto' }}>
-                <IconButton size="small" color={viewMode === 'list' ? 'primary' : 'default'} onClick={() => setViewMode('list')}>
-                  <ListIcon fontSize="small" />
-                </IconButton>
-                <IconButton size="small" color={viewMode === 'grid' ? 'primary' : 'default'} onClick={() => setViewMode('grid')}>
-                  <GridIcon fontSize="small" />
-                </IconButton>
-              </Box>
+              <Box sx={{ ml: 'auto' }}>{viewSwitch}</Box>
             </Stack>
-            {viewMode === 'grid' ? (
-              renderGridView
-            ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>名称</TableCell>
-                  <TableCell>所有者</TableCell>
-                  <TableCell>修改日期</TableCell>
-                  <TableCell>文件大小</TableCell>
-                  <TableCell align="right">操作</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredFiles.map((file) => (
-                  <TableRow key={file.id} hover>
-                    <TableCell sx={{ maxWidth: 460 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <FileIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                        <Typography noWrap>{file.filename}</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>我</TableCell>
-                    <TableCell>{formatModified(file.updatedAt ?? file.createdAt)}</TableCell>
-                    <TableCell>{formatFileSize(file.size)}</TableCell>
-                    <TableCell align="right">
-                      <Button size="small" startIcon={<DownloadLineIcon />} onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
-                        下载
-                      </Button>
-                      <Button size="small" startIcon={<ShareLineIcon />} onClick={() => createShare(file)}>
-                        分享
-                      </Button>
-                      <IconButton size="small" onClick={(e) => openActionMenu(e, file)}>
-                        <MoreIcon fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
+            {viewMode === 'grid' ? renderGridView : renderListView}
           </Box>
         ) : viewMode === 'grid' ? (
           renderGridView
@@ -890,24 +1115,28 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
                 <TableRow key={file.id} hover>
                   <TableCell sx={{ maxWidth: 460 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <FileIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                      <FileTypeBadge file={file} />
                       <Typography noWrap>{file.filename}</Typography>
                     </Box>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">{formatFileSize(file.size)}</Typography>
+                    <Typography variant="body2">{formatDisplayFileSize(file)}</Typography>
                     <Typography variant="caption" color="text.secondary">
                       {formatModified(file.updatedAt ?? file.createdAt)}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Button size="small" startIcon={<DownloadLineIcon />} onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
-                      下载
-                    </Button>
-                    <Button size="small" startIcon={<ShareLineIcon />} onClick={() => createShare(file)}>
-                      分享
-                    </Button>
-                    <IconButton size="small" onClick={(e) => openActionMenu(e, file)}>
+                    {canDownloadFile(file) && (
+                      <>
+                        <Button size="small" startIcon={<DownloadLineIcon />} onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
+                          下载
+                        </Button>
+                        <Button size="small" startIcon={<ShareLineIcon />} onClick={() => createShare(file)}>
+                          分享
+                        </Button>
+                      </>
+                    )}
+                    <IconButton size="small" aria-label={`打开文件操作菜单：${getBaseName(file.filename)}`} onClick={(e) => openActionMenu(e, file)}>
                       <MoreIcon fontSize="small" />
                     </IconButton>
                   </TableCell>
@@ -921,7 +1150,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
           <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
             <TextField size="small" fullWidth value={shareLink} slotProps={{ htmlInput: { readOnly: true } }} />
             <Tooltip title="复制链接">
-              <IconButton onClick={copyShareLink}>
+              <IconButton aria-label="复制分享链接" onClick={copyShareLink}>
                 <CopyIcon />
               </IconButton>
             </Tooltip>
@@ -929,7 +1158,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
         )}
       </Paper>
 
-      <Menu anchorEl={actionAnchor} open={Boolean(actionAnchor && actionFile)} onClose={closeActionMenu}>
+      <Menu anchorEl={actionAnchor} open={Boolean(actionAnchor && actionFile)} onClose={closeActionMenu} slotProps={{ list: { 'aria-label': '文件操作菜单' } }}>
         <MenuItem
           onClick={() => {
             if (actionFile) void requestMoveFile(actionFile)
@@ -958,18 +1187,18 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
           {actionFile && starredIds.includes(actionFile.id) ? '取消星标' : '加星标'}
         </MenuItem>
       </Menu>
-      <Menu anchorEl={filterAnchor} open={Boolean(filterMenu)} onClose={closeFilterMenu}>
+      <Menu anchorEl={filterAnchor} open={Boolean(filterMenu)} onClose={closeFilterMenu} slotProps={{ list: { 'aria-label': filterMenu === 'type' ? '类型筛选菜单' : '时间筛选菜单' } }}>
         {filterMenu === 'type' && (
           <>
             <MenuItem onClick={() => { setTypeFilter('all'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1 }} />全部类型</MenuItem>
-            <MenuItem onClick={() => { setTypeFilter('doc'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1 }} />文档</MenuItem>
-            <MenuItem onClick={() => { setTypeFilter('sheet'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1 }} />电子表格</MenuItem>
-            <MenuItem onClick={() => { setTypeFilter('slide'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1 }} />演示文稿</MenuItem>
-            <MenuItem onClick={() => { setTypeFilter('image'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1 }} />照片和图片</MenuItem>
-            <MenuItem onClick={() => { setTypeFilter('pdf'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1 }} />PDF</MenuItem>
-            <MenuItem onClick={() => { setTypeFilter('video'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1 }} />视频</MenuItem>
-            <MenuItem onClick={() => { setTypeFilter('archive'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1 }} />归档（ZIP）</MenuItem>
-            <MenuItem onClick={() => { setTypeFilter('audio'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1 }} />音频</MenuItem>
+            <MenuItem onClick={() => { setTypeFilter('doc'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1, color: '#5f6368' }} />文档</MenuItem>
+            <MenuItem onClick={() => { setTypeFilter('sheet'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1, color: '#0f9d58' }} />电子表格</MenuItem>
+            <MenuItem onClick={() => { setTypeFilter('slide'); closeFilterMenu() }}><FileIcon fontSize="small" sx={{ mr: 1, color: '#f9ab00' }} />演示文稿</MenuItem>
+            <MenuItem onClick={() => { setTypeFilter('image'); closeFilterMenu() }}><ImageIcon fontSize="small" sx={{ mr: 1, color: '#1a73e8' }} />照片和图片</MenuItem>
+            <MenuItem onClick={() => { setTypeFilter('pdf'); closeFilterMenu() }}><PdfIcon fontSize="small" sx={{ mr: 1, color: '#d93025' }} />PDF</MenuItem>
+            <MenuItem onClick={() => { setTypeFilter('video'); closeFilterMenu() }}><VideoIcon fontSize="small" sx={{ mr: 1, color: '#9334e6' }} />视频</MenuItem>
+            <MenuItem onClick={() => { setTypeFilter('archive'); closeFilterMenu() }}><ArchiveIcon fontSize="small" sx={{ mr: 1, color: '#5f6368' }} />归档（ZIP）</MenuItem>
+            <MenuItem onClick={() => { setTypeFilter('audio'); closeFilterMenu() }}><AudioIcon fontSize="small" sx={{ mr: 1, color: '#188038' }} />音频</MenuItem>
           </>
         )}
         {filterMenu === 'time' && (
@@ -984,13 +1213,23 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
         )}
       </Menu>
       <Dialog open={folderDialogOpen} onClose={() => setFolderDialogOpen(false)} slotProps={{ paper: { sx: dialogPaperSx } }}>
-        <DialogTitle>新建文件夹</DialogTitle>
-        <DialogContent>
-          <TextField autoFocus fullWidth size="small" value={folderPathInput} onChange={(e) => setFolderPathInput(e.target.value)} placeholder="例如：项目资料/2026" />
+        <DialogTitle sx={{ fontSize: 32, fontWeight: 500, pt: 3, pb: 2 }}>新建文件夹</DialogTitle>
+        <DialogContent sx={{ pt: 1, pb: 2 }}>
+          <TextField
+            autoFocus
+            fullWidth
+            size="medium"
+            value={folderPathInput}
+            onChange={(e) => setFolderPathInput(e.target.value)}
+            placeholder="例如：项目资料/2026"
+            sx={{ '& .MuiOutlinedInput-root': { minHeight: 58, fontSize: 18 } }}
+          />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setFolderDialogOpen(false)}>取消</Button>
-          <Button variant="contained" onClick={() => void confirmCreateFolder()}>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1 }}>
+          <Button size="large" onClick={() => setFolderDialogOpen(false)}>
+            取消
+          </Button>
+          <Button size="large" variant="contained" onClick={() => void confirmCreateFolder()}>
             创建
           </Button>
         </DialogActions>
@@ -1008,9 +1247,9 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
         </DialogActions>
       </Dialog>
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} slotProps={{ paper: { sx: dialogPaperSx } }}>
-        <DialogTitle>删除文件</DialogTitle>
+        <DialogTitle>{getDeleteDialogTitle(deleteTargetFile)}</DialogTitle>
         <DialogContent>
-          <Typography>确认删除文件「{deleteTargetFile?.filename ?? ''}」吗？删除后不可恢复。</Typography>
+          <Typography>{getDeleteDialogDescription(deleteTargetFile)}</Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>取消</Button>
@@ -1021,7 +1260,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
       </Dialog>
       <Snackbar open={Boolean(feedback)} autoHideDuration={4000} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         {feedback ? (
-          <Alert onClose={() => setFeedback(null)} severity={feedback.type} variant="filled" sx={{ width: '100%' }}>
+          <Alert onClose={() => setFeedback(null)} closeText="关闭" severity={feedback.type} variant="filled" sx={{ width: '100%' }}>
             {feedback.text}
           </Alert>
         ) : undefined}

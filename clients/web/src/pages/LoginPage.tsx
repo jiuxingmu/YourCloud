@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent, type SyntheticEvent } from 'react'
 import { Alert, Avatar, Box, Button, Card, CardContent, Divider, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@mui/material'
-import { request } from '../apiClient'
+import { request, toUserFriendlyErrorMessage } from '../apiClient'
 
 type Props = { onSuccess: () => void }
 
@@ -15,15 +15,15 @@ export default function LoginPage({ onSuccess }: Props) {
   async function submit() {
     const normalizedEmail = email.trim().toLowerCase()
     if (!normalizedEmail || !password) {
-      setFeedback({ type: 'error', text: 'Email and password are required.' })
+      setFeedback({ type: 'error', text: '请输入邮箱和密码。' })
       return
     }
     if (!emailPattern.test(normalizedEmail)) {
-      setFeedback({ type: 'error', text: 'Please enter a valid email address.' })
+      setFeedback({ type: 'error', text: '请输入有效的邮箱地址。' })
       return
     }
     if (mode === 'register' && password.length < 6) {
-      setFeedback({ type: 'error', text: 'Password must be at least 6 characters for registration.' })
+      setFeedback({ type: 'error', text: '注册密码至少需要 6 位。' })
       return
     }
 
@@ -43,7 +43,7 @@ export default function LoginPage({ onSuccess }: Props) {
       }
 
       if (path === '/api/v1/auth/register') {
-        setFeedback({ type: 'success', text: 'Register success, logging you in...' })
+        setFeedback({ type: 'success', text: '注册成功，正在为你登录...' })
         const loginData = await request<{ token?: string }>('/api/v1/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -54,10 +54,10 @@ export default function LoginPage({ onSuccess }: Props) {
           onSuccess()
           return
         }
-        setFeedback({ type: 'success', text: 'Register success. Please switch to Login to continue.' })
+        setFeedback({ type: 'success', text: '注册成功，请切换到登录继续。' })
       }
     } catch (e) {
-      setFeedback({ type: 'error', text: (e as Error).message })
+      setFeedback({ type: 'error', text: toUserFriendlyErrorMessage(e, 'auth') })
     } finally {
       setLoading(false)
     }
@@ -101,6 +101,8 @@ export default function LoginPage({ onSuccess }: Props) {
               value={mode}
               onChange={(_e: SyntheticEvent, value: 'login' | 'register') => {
                 setMode(value)
+                setEmail('')
+                setPassword('')
                 setFeedback(null)
               }}
               variant="fullWidth"
@@ -136,7 +138,7 @@ export default function LoginPage({ onSuccess }: Props) {
       </Card>
       <Snackbar open={Boolean(feedback)} autoHideDuration={4000} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         {feedback ? (
-          <Alert onClose={() => setFeedback(null)} severity={feedback.type} variant="filled" sx={{ width: '100%' }}>
+          <Alert onClose={() => setFeedback(null)} closeText="关闭" severity={feedback.type} variant="filled" sx={{ width: '100%' }}>
             {feedback.text}
           </Alert>
         ) : undefined}

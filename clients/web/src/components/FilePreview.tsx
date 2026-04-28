@@ -5,6 +5,11 @@ import { classifyPreviewKind, extensionOf } from './filePreviewKind'
 
 type PreviewSource = { id: number; filename: string; mimeType?: string; shareToken?: string; apiBase: string; lazy?: boolean }
 
+export function shouldFetchPreviewSource(id: number, mimeType?: string): boolean {
+  if (mimeType === 'inode/directory') return false
+  return id > 0
+}
+
 async function createVideoPoster(url: string): Promise<string> {
   return await new Promise((resolve, reject) => {
     const video = document.createElement('video')
@@ -72,6 +77,12 @@ export default function FilePreview({ id, filename, mimeType, shareToken, apiBas
 
   useEffect(() => {
     if (!visible) return
+    if (!shouldFetchPreviewSource(id, mimeType)) {
+      setLoading(false)
+      setPreviewUrl('')
+      setTextPreview('')
+      return
+    }
     let disposed = false
     let objectUrl = ''
 
@@ -113,7 +124,7 @@ export default function FilePreview({ id, filename, mimeType, shareToken, apiBas
       disposed = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [apiBase, id, kind, shareToken, visible])
+  }, [apiBase, id, kind, mimeType, shareToken, visible])
 
   if (!visible) {
     return (
@@ -138,7 +149,14 @@ export default function FilePreview({ id, filename, mimeType, shareToken, apiBas
         component="img"
         src={previewUrl}
         alt={filename}
-        sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', borderRadius: 0 }}
+        sx={{
+          width: '100%',
+          height: '100%',
+          objectFit: kind === 'image' ? 'contain' : 'cover',
+          objectPosition: 'center',
+          borderRadius: 0,
+          bgcolor: kind === 'image' ? '#f5f7fb' : 'transparent',
+        }}
       />
     )
   }

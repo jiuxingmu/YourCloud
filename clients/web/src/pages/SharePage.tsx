@@ -4,6 +4,11 @@ import { request } from '../apiClient'
 import FilePreview from '../components/FilePreview'
 
 type Props = { token: string }
+export const SHARE_LINK_INVALID_TEXT = '分享链接无效或已失效'
+
+export function getShareValidationError(token: string): string | null {
+  return token ? null : SHARE_LINK_INVALID_TEXT
+}
 
 function DownloadLineIcon(props: SvgIconProps) {
   return (
@@ -27,9 +32,15 @@ export default function SharePage({ token }: Props) {
   const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
   useEffect(() => {
+    const validationError = getShareValidationError(token)
+    if (validationError) {
+      setData(null)
+      setError(validationError)
+      return
+    }
     request<{ file: { filename: string; id: number; mimeType?: string } }>(`/api/v1/shares/${token}`)
       .then(setData)
-      .catch((e) => setError((e as Error).message))
+      .catch(() => setError(SHARE_LINK_INVALID_TEXT))
   }, [token])
 
   return (

@@ -23,6 +23,7 @@ build/
 out/
 **/build/
 .worktrees/
+dogfood-output/
 
 # Node / Vite
 node_modules/

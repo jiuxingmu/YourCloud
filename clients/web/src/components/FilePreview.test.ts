@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { classifyPreviewKind } from './filePreviewKind'
+import { shouldFetchPreviewSource } from './FilePreview'
 
 describe('classifyPreviewKind', () => {
   it('classifies image and video from mime type', () => {
@@ -21,5 +22,19 @@ describe('classifyPreviewKind', () => {
 
   it('falls back to other for unknown binary types', () => {
     expect(classifyPreviewKind('archive.zip')).toBe('other')
+  })
+})
+
+describe('shouldFetchPreviewSource', () => {
+  it('blocks preview fetching for folders', () => {
+    expect(shouldFetchPreviewSource(100, 'inode/directory')).toBe(false)
+  })
+
+  it('blocks preview fetching for synthetic ids', () => {
+    expect(shouldFetchPreviewSource(-1777374944622, 'text/plain')).toBe(false)
+  })
+
+  it('allows preview fetching for real files', () => {
+    expect(shouldFetchPreviewSource(42, 'text/plain')).toBe(true)
   })
 })

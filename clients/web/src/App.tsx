@@ -28,6 +28,22 @@ import FilesPage from './pages/FilesPage'
 import LoginPage from './pages/LoginPage'
 import SharePage from './pages/SharePage'
 
+export function getShareTokenFromLocation(pathname: string, search: string): string | null {
+  const queryToken = new URLSearchParams(search).get('share')
+  if (queryToken) return queryToken
+  const match = pathname.match(/^\/share\/([^/?#]+)/)
+  if (!match) return null
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return match[1]
+  }
+}
+
+export function isShareRoute(pathname: string): boolean {
+  return /^\/share(?:\/|$)/.test(pathname)
+}
+
 const theme = createTheme({
   palette: {
     mode: 'light',
@@ -120,7 +136,8 @@ function TrashIcon(props: SvgIconProps) {
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(!!localStorage.getItem('token'))
-  const shareToken = useMemo(() => new URLSearchParams(location.search).get('share'), [])
+  const shareToken = useMemo(() => getShareTokenFromLocation(location.pathname, location.search), [])
+  const shareRoute = useMemo(() => isShareRoute(location.pathname), [])
   const [activeNav, setActiveNav] = useState<'home' | 'drive' | 'recent' | 'starred' | 'trash'>('home')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
@@ -180,7 +197,8 @@ export default function App() {
     }
   }, [loggedIn, shareToken])
 
-  const shouldRenderShell = !!shareToken || loggedIn
+  const shouldRenderSharePage = shareRoute || !!shareToken
+  const shouldRenderShell = shouldRenderSharePage || loggedIn
   const navItems: Array<{ id: 'home' | 'drive' | 'recent' | 'starred' | 'trash'; label: string; icon: JSX.Element }> = [
     { id: 'home', label: '首页', icon: <HomeIcon fontSize="small" /> },
     { id: 'drive', label: '我的云硬盘', icon: <DriveIcon fontSize="small" /> },
@@ -255,7 +273,7 @@ export default function App() {
                   </datalist>
                 </Box>
                 <Box sx={{ width: 220, ml: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5 }}>
-                  <IconButton size="small" onClick={(e) => setSettingsAnchor(e.currentTarget)}>
+                  <IconButton size="small" aria-label="打开设置菜单" onClick={(e) => setSettingsAnchor(e.currentTarget)}>
                     <SettingsIcon fontSize="small" />
                   </IconButton>
                   {!shareToken && loggedIn && (
@@ -263,7 +281,7 @@ export default function App() {
                       退出
                     </Button>
                   )}
-                  <IconButton size="small" onClick={(e) => setAvatarAnchor(e.currentTarget)}>
+                  <IconButton size="small" aria-label="打开账号菜单" onClick={(e) => setAvatarAnchor(e.currentTarget)}>
                     <Avatar sx={{ width: 30, height: 30, fontSize: 14, bgcolor: '#5f72c8' }}>Wu</Avatar>
                   </IconButton>
                 </Box>
@@ -302,7 +320,7 @@ export default function App() {
               </Box>
 
               <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 } }}>
-                {shareToken ? <SharePage token={shareToken} /> : <FilesPage searchQuery={searchQuery} section={activeNav} />}
+                {shouldRenderSharePage ? <SharePage token={shareToken ?? ''} /> : <FilesPage searchQuery={searchQuery} section={activeNav} />}
               </Box>
             </Box>
             <Menu
@@ -311,6 +329,9 @@ export default function App() {
               onClose={() => setSettingsAnchor(null)}
               slotProps={{ paper: { sx: { borderRadius: 0 } } }}
             >
+              <MenuItem disableRipple sx={{ pointerEvents: 'none', opacity: 1, fontSize: 12, color: 'text.secondary' }}>
+                设置
+              </MenuItem>
               <MenuItem
                 onClick={() => {
                   localStorage.removeItem('search_history_files')
@@ -370,10 +391,20 @@ export default function App() {
                   </Typography>
                 </Box>
               </MenuItem>
+              {!shareToken && loggedIn && (
+                <MenuItem
+                  onClick={() => {
+                    setAvatarAnchor(null)
+                    logout()
+                  }}
+                >
+                  退出登录
+                </MenuItem>
+              )}
             </Menu>
             <Snackbar open={Boolean(feedback)} autoHideDuration={2800} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
               {feedback ? (
-                <Alert onClose={() => setFeedback(null)} severity={feedback.type} variant="filled" sx={{ width: '100%' }}>
+                <Alert onClose={() => setFeedback(null)} closeText="关闭" severity={feedback.type} variant="filled" sx={{ width: '100%' }}>
                   {feedback.text}
                 </Alert>
               ) : undefined}
