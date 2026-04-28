@@ -9,7 +9,7 @@ export type FileItem = {
 
 export type DeletedItem = { id: number; filename: string; deletedAt: string }
 
-export type FileSection = 'home' | 'drive' | 'recent' | 'starred' | 'trash'
+export type FileSection = 'drive' | 'recent' | 'starred' | 'trash'
 
 export type TypeFilter = 'all' | 'doc' | 'sheet' | 'slide' | 'image' | 'pdf' | 'video' | 'archive' | 'audio'
 

@@ -35,7 +35,7 @@ export function SettingsIcon(props: SvgIconProps) {
 export function DriveIcon(props: SvgIconProps) {
   return (
     <SvgIcon {...props} viewBox="0 0 24 24">
-      <path d="M7.2 4 2 13l2.4 4h5.2L15 8 12.8 4zm7.6 0L20 13h-5.4L9.4 4zM10.8 20H22l-2.4-4H8.4z" />
+      <path d="M6 3h8l4 4v14H6zm8 1.5V8h3.5zM8 11h8v2H8zm0 4h8v2H8z" />
     </SvgIcon>
   )
 }
@@ -115,7 +115,7 @@ export function DownloadLineIcon(props: SvgIconProps) {
 export function ShareLineIcon(props: SvgIconProps) {
   return (
     <SvgIcon {...props} viewBox="0 0 24 24">
-      <path d="m15 8 1.41 1.41L14.83 11H18a3 3 0 0 1 0 6h-2v-2h2a1 1 0 1 0 0-2h-3.17l1.58 1.59L15 16l-4-4zM6 5h6v2H6a1 1 0 1 0 0 2h2v2H6a3 3 0 0 1 0-6z" />
+      <path d="M18 16a3 3 0 0 0-2.39 1.19l-6.32-3.17a2.9 2.9 0 0 0 0-2.04l6.32-3.17A3 3 0 1 0 15 7a2.9 2.9 0 0 0 .05.52L8.73 10.7a3 3 0 1 0 0 2.6l6.32 3.18A3 3 0 1 0 18 16z" />
     </SvgIcon>
   )
 }

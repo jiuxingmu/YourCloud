@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
-import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material'
-import { FolderPlusIcon } from '../../../shared/icons/YourCloudIcons'
+import { Box, Button, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
 import { ViewModeSwitch } from './ViewModeSwitch'
 import { formatModified, getTrashClearFeedbackText, type DeletedItem, type FileSection } from '../domain'
 
@@ -12,7 +11,6 @@ type Props = {
   renderGridView: ReactNode
   renderListView: ReactNode
   filterAndViewControls: ReactNode
-  recommendedFolder: string
   currentDrivePath: string
   setCurrentDrivePath: (path: string) => void
   deletedItems: DeletedItem[]
@@ -31,7 +29,6 @@ export function FilesSectionContent(props: Props) {
     renderGridView,
     renderListView,
     filterAndViewControls,
-    recommendedFolder,
     currentDrivePath,
     setCurrentDrivePath,
     deletedItems,
@@ -41,40 +38,8 @@ export function FilesSectionContent(props: Props) {
     setViewMode,
   } = props
 
-  if (!loading && section === 'home') {
-    return (
-      <Box sx={{ display: 'grid', gap: 2 }}>
-        <Typography sx={{ fontSize: 34, fontWeight: 500 }}>欢迎使用云端硬盘</Typography>
-        <Box>
-          <Typography sx={{ fontWeight: 600, mb: 1 }}>建议的文件夹</Typography>
-          <Card variant="outlined" sx={{ maxWidth: 360, borderRadius: 0, borderColor: '#e6eaf0' }}>
-            <CardContent sx={{ py: 1.4 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                <FolderPlusIcon fontSize="small" />
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography noWrap sx={{ fontWeight: 600 }}>
-                    {recommendedFolder}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    位于「我的云端硬盘」
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Box>
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-            <Typography sx={{ fontWeight: 600 }}>建议的文件</Typography>
-            {shouldUseTopRightViewSwitch(section) ? <ViewModeSwitch viewMode={viewMode} onChange={setViewMode} /> : null}
-          </Box>
-          {viewMode === 'grid' ? renderGridView : renderListView}
-        </Box>
-      </Box>
-    )
-  }
-
   if (!loading && section === 'trash') {
+    const trashHeaderCellSx = { width: '50%' }
     return (
       <Box sx={{ p: 2 }}>
         <Stack direction="row" sx={{ mb: 1.5, justifyContent: 'space-between', alignItems: 'center' }}>
@@ -90,20 +55,36 @@ export function FilesSectionContent(props: Props) {
             清空记录
           </Button>
         </Stack>
-        {deletedItems.length === 0 ? (
-          <Typography color="text.secondary">暂无记录</Typography>
-        ) : (
-          <Stack spacing={1}>
+        <Table
+          size="small"
+          sx={{
+            tableLayout: 'fixed',
+            '& .MuiTableCell-root': { px: 1.5, py: 1, whiteSpace: 'nowrap' },
+            '& .MuiTableHead-root .MuiTableCell-root': { fontWeight: 600, color: 'text.secondary', borderBottomColor: '#e6eaf0' },
+          }}
+        >
+          <TableHead>
+            <TableRow>
+              <TableCell sx={trashHeaderCellSx}>名称</TableCell>
+              <TableCell sx={trashHeaderCellSx}>删除时间</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {deletedItems.map((item) => (
-              <Box key={`${item.id}-${item.deletedAt}`} sx={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eef1f4', pb: 0.8 }}>
-                <Typography>{item.filename}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {formatModified(item.deletedAt)}
-                </Typography>
-              </Box>
+              <TableRow key={`${item.id}-${item.deletedAt}`}>
+                <TableCell>{item.filename}</TableCell>
+                <TableCell>{formatModified(item.deletedAt)}</TableCell>
+              </TableRow>
             ))}
-          </Stack>
-        )}
+            {deletedItems.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={2}>
+                  <Typography color="text.secondary">暂无记录</Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </Box>
     )
   }
@@ -143,7 +124,7 @@ export function FilesSectionContent(props: Props) {
           </Box>
         </Box>
         {filterAndViewControls}
-        {!loading && filteredCount === 0 ? (
+        {!loading && filteredCount === 0 && viewMode === 'grid' ? (
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <Typography sx={{ fontWeight: 600, mb: 1 }}>没有匹配的文件</Typography>
             <Typography color="text.secondary">尝试更换关键词，或点击“上传文件”创建内容。</Typography>
@@ -157,7 +138,7 @@ export function FilesSectionContent(props: Props) {
     )
   }
 
-  if (!loading && filteredCount === 0) {
+  if (!loading && filteredCount === 0 && viewMode === 'grid') {
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
         <Typography sx={{ fontWeight: 600, mb: 1 }}>没有匹配的文件</Typography>

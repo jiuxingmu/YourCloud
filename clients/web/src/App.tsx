@@ -30,10 +30,11 @@ import { authHeaders, request } from './apiClient'
 import { emitStarredCleared, emitTrashCleared, onFilesChanged } from './features/files/data/filesEvents'
 import { clearDeletedItems, clearSearchHistory, clearStarredIds, readSearchHistory, writeSearchHistory } from './features/files/data/filesStorage'
 import { formatBytes } from './shared/formatters/bytes'
-import { ClockIcon, DriveIcon, HomeIcon, SearchLineIcon, SettingsIcon, StarIcon, TrashIcon } from './shared/icons/YourCloudIcons'
+import { ClockIcon, HomeIcon, SearchLineIcon, SettingsIcon, ShareLineIcon, StarIcon, TrashIcon } from './shared/icons/YourCloudIcons'
 import FilesPage from './pages/FilesPage'
 import LoginPage from './pages/LoginPage'
 import SharePage from './pages/SharePage'
+import SharesPage from './pages/SharesPage'
 
 export function getShareTokenFromLocation(pathname: string, search: string): string | null {
   const queryToken = new URLSearchParams(search).get('share')
@@ -108,7 +109,7 @@ export default function App() {
   const [loggedIn, setLoggedIn] = useState(!!localStorage.getItem('token'))
   const shareToken = useMemo(() => getShareTokenFromLocation(location.pathname, location.search), [])
   const shareRoute = useMemo(() => isShareRoute(location.pathname), [])
-  const [activeNav, setActiveNav] = useState<'home' | 'drive' | 'recent' | 'starred' | 'trash'>('home')
+  const [activeNav, setActiveNav] = useState<'drive' | 'recent' | 'starred' | 'trash' | 'shares'>('drive')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHistory, setSearchHistory] = useState<string[]>(() => readSearchHistory())
   const [searchOpen, setSearchOpen] = useState(false)
@@ -177,10 +178,10 @@ export default function App() {
   const resolvedName = currentUser?.email ? displayNameFromEmail(currentUser.email) : 'YourCloud 用户'
   const resolvedEmail = currentUser?.email || 'unknown@yourcloud.app'
   const resolvedAvatar = avatarTextFromName(resolvedName)
-  const navItems: Array<{ id: 'home' | 'drive' | 'recent' | 'starred' | 'trash'; label: string; icon: JSX.Element }> = [
-    { id: 'home', label: '首页', icon: <HomeIcon fontSize="small" /> },
-    { id: 'drive', label: '我的云硬盘', icon: <DriveIcon fontSize="small" /> },
+  const navItems: Array<{ id: 'drive' | 'recent' | 'starred' | 'trash' | 'shares'; label: string; icon: JSX.Element }> = [
+    { id: 'drive', label: '我的云盘', icon: <HomeIcon fontSize="small" /> },
     { id: 'recent', label: '最近使用', icon: <ClockIcon fontSize="small" /> },
+    { id: 'shares', label: '分享管理', icon: <ShareLineIcon fontSize="small" /> },
     { id: 'starred', label: '已加星标', icon: <StarIcon fontSize="small" /> },
     { id: 'trash', label: '回收站', icon: <TrashIcon fontSize="small" /> },
   ]
@@ -337,7 +338,13 @@ export default function App() {
               </Box>
 
               <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 } }}>
-                {shouldRenderSharePage ? <SharePage token={shareToken ?? ''} /> : <FilesPage searchQuery={searchQuery} section={activeNav} />}
+                {shouldRenderSharePage ? (
+                  <SharePage token={shareToken ?? ''} />
+                ) : activeNav === 'shares' ? (
+                  <SharesPage />
+                ) : (
+                  <FilesPage searchQuery={searchQuery} section={activeNav} />
+                )}
               </Box>
             </Box>
             <Menu

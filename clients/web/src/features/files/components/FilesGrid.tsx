@@ -67,10 +67,10 @@ export function FilesGrid({ section, items, downloadingId, onOpenFolder, onDownl
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
                 {canDownloadFile(file) && (
                   <>
-                    <Button size="small" onClick={() => onDownload(file)} disabled={downloadingId === file.id}>
+                    <Button size="small" startIcon={<DownloadLineIcon fontSize="small" />} onClick={() => onDownload(file)} disabled={downloadingId === file.id}>
                       下载
                     </Button>
-                    <Button size="small" onClick={() => onShare(file)}>
+                    <Button size="small" startIcon={<ShareLineIcon fontSize="small" />} onClick={() => onShare(file)}>
                       分享
                     </Button>
                   </>

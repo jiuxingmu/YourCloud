@@ -81,3 +81,28 @@ export async function getShare(token: string, extractCode?: string): Promise<{ f
   const path = withExtractCode(`/api/v1/shares/${token}`, extractCode)
   return await request<{ file: { filename: string; id: number; mimeType?: string } }>(path)
 }
+
+export type ManagedShareItem = {
+  share: {
+    id: number
+    token: string
+    fileId: number
+    createdBy: number
+    expiresAt?: string | null
+    revokedAt?: string | null
+    createdAt?: string
+    updatedAt?: string
+  }
+  fileId: number
+  filename: string
+  mimeType?: string
+  extractCode?: string
+}
+
+export async function listMyShares(): Promise<ManagedShareItem[]> {
+  return await request<ManagedShareItem[]>('/api/v1/shares', { headers: { ...authHeaders() } })
+}
+
+export async function revokeShare(shareId: number): Promise<void> {
+  await request<void>(`/api/v1/shares/${shareId}/revoke`, { method: 'PATCH', headers: { ...authHeaders() } })
+}

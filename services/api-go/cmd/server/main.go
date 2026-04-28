@@ -72,6 +72,8 @@ func main() {
 	protected.DELETE("/files/:id", fileHandler.Delete)
 	protected.PATCH("/files/:id/move", fileHandler.Move)
 	protected.POST("/shares", shareHandler.Create)
+	protected.GET("/shares", shareHandler.ListMine)
+	protected.PATCH("/shares/:id/revoke", shareHandler.RevokeMine)
 
 	log.Printf("backend listening on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {

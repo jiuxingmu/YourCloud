@@ -7,8 +7,7 @@ describe('FilesPage helpers', () => {
     expect(typeof FilesPageContainer).toBe('function')
   })
 
-  it('hides create actions in home and trash', () => {
-    expect(shouldShowCreateActions('home')).toBe(false)
+  it('hides create actions in trash', () => {
     expect(shouldShowCreateActions('trash')).toBe(false)
   })
 
@@ -18,16 +17,14 @@ describe('FilesPage helpers', () => {
     expect(shouldShowCreateActions('recent')).toBe(false)
   })
 
-  it('defaults home/drive/recent/starred panels to list view', () => {
-    expect(getDefaultViewModeForSection('home')).toBe('list')
+  it('defaults drive/recent/starred panels to list view', () => {
     expect(getDefaultViewModeForSection('recent')).toBe('list')
     expect(getDefaultViewModeForSection('starred')).toBe('list')
     expect(getDefaultViewModeForSection('drive')).toBe('list')
     expect(getDefaultViewModeForSection('trash')).toBe('grid')
   })
 
-  it('uses top-right view switch for home/drive/recent/starred panels', () => {
-    expect(shouldUseTopRightViewSwitch('home')).toBe(true)
+  it('uses top-right view switch for drive/recent/starred panels', () => {
     expect(shouldUseTopRightViewSwitch('drive')).toBe(true)
     expect(shouldUseTopRightViewSwitch('recent')).toBe(true)
     expect(shouldUseTopRightViewSwitch('starred')).toBe(true)

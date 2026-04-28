@@ -28,6 +28,7 @@ type Share struct {
 	CreatedBy uint       `gorm:"index;not null" json:"createdBy"`
 	Passcode  string     `gorm:"size:64" json:"-"`
 	ExpiresAt *time.Time `json:"expiresAt"`
+	RevokedAt *time.Time `json:"revokedAt"`
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
 }

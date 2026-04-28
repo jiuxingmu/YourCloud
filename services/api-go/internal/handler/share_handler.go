@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"yourcloud/backend-go/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type ShareHandler struct {
@@ -77,8 +79,12 @@ func (h ShareHandler) GetByToken(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "EXTRACT_CODE_INVALID", "message": "extract code invalid"}})
 		return
 	}
-	if s.ExpiresAt != nil && s.ExpiresAt.Before(time.Now()) {
-		c.JSON(http.StatusGone, gin.H{"error": gin.H{"code": "EXPIRED", "message": "share expired"}})
+	if inactive, code := h.Shares.IsInactive(s, time.Now()); inactive {
+		message := "share expired"
+		if code == "REVOKED" {
+			message = "share revoked"
+		}
+		c.JSON(http.StatusGone, gin.H{"error": gin.H{"code": code, "message": message}})
 		return
 	}
 	f, err := h.FileRepo.FindByID(s.FileID)
@@ -101,8 +107,12 @@ func (h ShareHandler) DownloadByToken(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "EXTRACT_CODE_INVALID", "message": "extract code invalid"}})
 		return
 	}
-	if s.ExpiresAt != nil && s.ExpiresAt.Before(time.Now()) {
-		c.JSON(http.StatusGone, gin.H{"error": gin.H{"code": "EXPIRED", "message": "share expired"}})
+	if inactive, code := h.Shares.IsInactive(s, time.Now()); inactive {
+		message := "share expired"
+		if code == "REVOKED" {
+			message = "share revoked"
+		}
+		c.JSON(http.StatusGone, gin.H{"error": gin.H{"code": code, "message": message}})
 		return
 	}
 	f, err := h.FileRepo.FindByID(s.FileID)
@@ -132,8 +142,12 @@ func (h ShareHandler) ThumbnailByToken(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "EXTRACT_CODE_INVALID", "message": "extract code invalid"}})
 		return
 	}
-	if s.ExpiresAt != nil && s.ExpiresAt.Before(time.Now()) {
-		c.JSON(http.StatusGone, gin.H{"error": gin.H{"code": "EXPIRED", "message": "share expired"}})
+	if inactive, code := h.Shares.IsInactive(s, time.Now()); inactive {
+		message := "share expired"
+		if code == "REVOKED" {
+			message = "share revoked"
+		}
+		c.JSON(http.StatusGone, gin.H{"error": gin.H{"code": code, "message": message}})
 		return
 	}
 	f, err := h.FileRepo.FindByID(s.FileID)
@@ -160,4 +174,37 @@ func ParseUintParam(raw string) uint {
 		return 0
 	}
 	return uint(i)
+}
+
+func (h ShareHandler) ListMine(c *gin.Context) {
+	userID := c.MustGet("userID").(uint)
+	items, err := h.Shares.ListByCreator(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "SHARE_LIST_FAILED", "message": "list shares failed"}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h ShareHandler) RevokeMine(c *gin.Context) {
+	userID := c.MustGet("userID").(uint)
+	shareID := ParseUintParam(c.Param("id"))
+	if shareID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid share id"}})
+		return
+	}
+	share, err := h.Shares.RevokeByCreator(userID, shareID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "share not found"}})
+			return
+		}
+		if errors.Is(err, service.ErrShareAlreadyRevoked) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "ALREADY_REVOKED", "message": "share already revoked"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "REVOKE_FAILED", "message": "revoke failed"}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": share})
 }

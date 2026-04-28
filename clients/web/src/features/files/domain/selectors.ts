@@ -17,7 +17,7 @@ export function getRelativeBucket(value?: string): 'today' | 'lastMonth' | 'earl
   if (date.getTime() > now.getTime()) return 'earlier'
   if (date.toDateString() === now.toDateString()) return 'today'
   const monthDiff = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth())
-  if (monthDiff >= 0 && monthDiff <= 1) return 'lastMonth'
+  if (monthDiff === 1) return 'lastMonth'
   return 'earlier'
 }
 

@@ -62,10 +62,8 @@ type Props = {
   handleUploadChange: (event: ChangeEvent<HTMLInputElement>) => void
   load: () => Promise<void>
   filteredFiles: FileItem[]
-  recommendedFiles: FileItem[]
-  recentGroups: { today: FileItem[]; lastMonth: FileItem[]; earlier: FileItem[] }
+  recentGroups: { today: FileItem[]; past7Days: FileItem[]; past30Days: FileItem[]; thisYear: FileItem[]; lastYear: FileItem[]; earlier: FileItem[] }
   openFolder: (file: FileItem) => void
-  recommendedFolder: string
   currentDrivePath: string
   setCurrentDrivePath: (path: string) => void
   deletedItems: DeletedItem[]
@@ -95,10 +93,8 @@ export default function FilesPageView(props: Props) {
     handleUploadChange,
     load,
     filteredFiles,
-    recommendedFiles,
     recentGroups,
     openFolder,
-    recommendedFolder,
     currentDrivePath,
     setCurrentDrivePath,
     deletedItems,
@@ -133,7 +129,6 @@ export default function FilesPageView(props: Props) {
     <FilesListTable
       section={section}
       items={filteredFiles}
-      recommendedFiles={recommendedFiles}
       recentGroups={recentGroups}
       downloadingId={actions.downloadingId}
       onDownload={actions.download}
@@ -193,7 +188,6 @@ export default function FilesPageView(props: Props) {
           renderGridView={renderGridView}
           renderListView={renderListView}
           filterAndViewControls={filterAndViewControls}
-          recommendedFolder={recommendedFolder}
           currentDrivePath={currentDrivePath}
           setCurrentDrivePath={setCurrentDrivePath}
           deletedItems={deletedItems}

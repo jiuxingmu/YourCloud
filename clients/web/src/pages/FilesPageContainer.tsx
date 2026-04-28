@@ -2,7 +2,7 @@ import { useEffect, useState, type ChangeEvent } from 'react'
 import { toUserFriendlyErrorMessage } from '../apiClient'
 import { onStarredCleared, onTrashCleared } from '../features/files/data/filesEvents'
 import { readDeletedItems, readStarredIds, writeDeletedItems, writeStarredIds } from '../features/files/data/filesStorage'
-import { canDownloadFile, deriveDriveItems, getParentPath, getRelativeBucket, normalizePath, shouldShowCreateActions, shouldUseTopRightViewSwitch, type DeletedItem } from '../features/files/domain'
+import { canDownloadFile, deriveDriveItems, getParentPath, matchesTimeFilter, normalizePath, shouldShowCreateActions, shouldUseTopRightViewSwitch, type DeletedItem } from '../features/files/domain'
 import { useDriveNavigation } from '../features/files/hooks/useDriveNavigation'
 import { useFileActions } from '../features/files/hooks/useFileActions'
 import { useFilesData } from '../features/files/hooks/useFilesData'
@@ -11,7 +11,7 @@ import { useViewModeBySection } from '../features/files/hooks/useViewModeBySecti
 import type { FilesPageProps } from './FilesPage'
 import FilesPageView from './FilesPageView'
 
-export default function FilesPageContainer({ searchQuery = '', section = 'home' }: FilesPageProps) {
+export default function FilesPageContainer({ searchQuery = '', section = 'drive' }: FilesPageProps) {
   const [starredIds, setStarredIds] = useState<number[]>(() => readStarredIds())
   const [deletedItems, setDeletedItems] = useState<DeletedItem[]>(() => readDeletedItems())
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -89,15 +89,19 @@ export default function FilesPageContainer({ searchQuery = '', section = 'home' 
   const { setTypeFilter, setTimeFilter, filterMenu, filterAnchor, openFilterMenu, closeFilterMenu, filteredFiles } = useFilesFilters(sectionFiles, searchQuery)
 
   const recentGroups = {
-    today: filteredFiles.filter((file) => getRelativeBucket(file.updatedAt ?? file.createdAt) === 'today'),
-    lastMonth: filteredFiles.filter((file) => getRelativeBucket(file.updatedAt ?? file.createdAt) === 'lastMonth'),
-    earlier: filteredFiles.filter((file) => getRelativeBucket(file.updatedAt ?? file.createdAt) === 'earlier'),
+    today: filteredFiles.filter((file) => matchesTimeFilter(file, 'today')),
+    past7Days: filteredFiles.filter((file) => matchesTimeFilter(file, '7d') && !matchesTimeFilter(file, 'today')),
+    past30Days: filteredFiles.filter((file) => matchesTimeFilter(file, '30d') && !matchesTimeFilter(file, '7d')),
+    thisYear: filteredFiles.filter((file) => matchesTimeFilter(file, 'thisYear') && !matchesTimeFilter(file, '30d')),
+    lastYear: filteredFiles.filter((file) => matchesTimeFilter(file, 'lastYear')),
+    earlier: filteredFiles.filter((file) => {
+      const raw = file.updatedAt ?? file.createdAt
+      if (!raw) return true
+      const date = new Date(raw)
+      if (Number.isNaN(date.getTime())) return true
+      return !matchesTimeFilter(file, 'thisYear') && !matchesTimeFilter(file, 'lastYear')
+    }),
   }
-  const recommendedFiles = [...files]
-    .filter((file) => file.mimeType !== 'inode/directory')
-    .sort((a, b) => +new Date(b.updatedAt ?? b.createdAt ?? 0) - +new Date(a.updatedAt ?? a.createdAt ?? 0))
-    .slice(0, 4)
-  const recommendedFolder = files.find((file) => file.filename.includes('/'))?.filename.split('/')[0] || (files[0]?.filename.replace(/\.[^/.]+$/, '') || '示例文件夹')
   const moveFolderOptions = Array.from(
     files.reduce((acc, file) => {
       const normalized = normalizePath(file.filename)
@@ -118,10 +122,8 @@ export default function FilesPageContainer({ searchQuery = '', section = 'home' 
       handleUploadChange={handleUploadChange}
       load={load}
       filteredFiles={filteredFiles}
-      recommendedFiles={recommendedFiles}
       recentGroups={recentGroups}
       openFolder={openFolder}
-      recommendedFolder={recommendedFolder}
       currentDrivePath={currentDrivePath}
       setCurrentDrivePath={setCurrentDrivePath}
       deletedItems={deletedItems}

@@ -16,6 +16,15 @@ type ShareService struct {
 }
 
 var ErrInvalidExtractCode = errors.New("invalid extract code")
+var ErrShareAlreadyRevoked = errors.New("share already revoked")
+
+type ShareWithFile struct {
+	Share    *model.Share `json:"share"`
+	FileID   uint         `json:"fileId"`
+	Filename string       `json:"filename"`
+	MimeType string       `json:"mimeType"`
+	ExtractCode string    `json:"extractCode"`
+}
 
 func newShareToken() string {
 	return strings.ReplaceAll(uuid.NewString(), "-", "")
@@ -68,4 +77,59 @@ func (s ShareService) ValidateExtractCode(share *model.Share, providedCode strin
 		return ErrInvalidExtractCode
 	}
 	return nil
+}
+
+func (s ShareService) IsInactive(share *model.Share, now time.Time) (bool, string) {
+	if share == nil {
+		return true, "NOT_FOUND"
+	}
+	if share.RevokedAt != nil {
+		return true, "REVOKED"
+	}
+	if share.ExpiresAt != nil && share.ExpiresAt.Before(now) {
+		return true, "EXPIRED"
+	}
+	return false, ""
+}
+
+func (s ShareService) ListByCreator(creatorID uint) ([]ShareWithFile, error) {
+	shares, err := s.Shares.ListByCreator(creatorID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]ShareWithFile, 0, len(shares))
+	for _, item := range shares {
+		file, fileErr := s.Files.FindByID(item.FileID)
+		filename := "[已删除文件]"
+		mimeType := ""
+		if fileErr == nil {
+			filename = file.Filename
+			mimeType = file.MimeType
+		}
+		shareCopy := item
+		result = append(result, ShareWithFile{
+			Share:    &shareCopy,
+			FileID:   item.FileID,
+			Filename: filename,
+			MimeType: mimeType,
+			ExtractCode: strings.TrimSpace(item.Passcode),
+		})
+	}
+	return result, nil
+}
+
+func (s ShareService) RevokeByCreator(creatorID, shareID uint) (*model.Share, error) {
+	share, err := s.Shares.FindByIDForCreator(shareID, creatorID)
+	if err != nil {
+		return nil, err
+	}
+	if share.RevokedAt != nil {
+		return nil, ErrShareAlreadyRevoked
+	}
+	now := time.Now()
+	share.RevokedAt = &now
+	if err := s.Shares.Save(share); err != nil {
+		return nil, err
+	}
+	return share, nil
 }

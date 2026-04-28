@@ -7,8 +7,7 @@ import { FileTypeBadge } from './FileTypeBadge'
 type Props = {
   section: FileSection
   items: FileItem[]
-  recommendedFiles: FileItem[]
-  recentGroups: { today: FileItem[]; lastMonth: FileItem[]; earlier: FileItem[] }
+  recentGroups: { today: FileItem[]; past7Days: FileItem[]; past30Days: FileItem[]; thisYear: FileItem[]; lastYear: FileItem[]; earlier: FileItem[] }
   downloadingId: number | null
   onDownload: (file: FileItem) => void
   onShare: (file: FileItem) => void
@@ -16,7 +15,7 @@ type Props = {
   onOpenFolder: (file: FileItem) => void
 }
 
-export function FilesListTable({ section, items, recommendedFiles, recentGroups, downloadingId, onDownload, onShare, onOpenMenu, onOpenFolder }: Props) {
+export function FilesListTable({ section, items, recentGroups, downloadingId, onDownload, onShare, onOpenMenu, onOpenFolder }: Props) {
   const unifiedTableSx = {
     tableLayout: 'fixed',
     '& .MuiTableCell-root': { px: 1.5, py: 1, whiteSpace: 'nowrap' },
@@ -29,10 +28,10 @@ export function FilesListTable({ section, items, recommendedFiles, recentGroups,
       <>
         {canDownloadFile(file) && (
           <>
-            <Button size="small" onClick={() => onDownload(file)} disabled={downloadingId === file.id}>
+            <Button size="small" startIcon={<DownloadLineIcon fontSize="small" />} onClick={() => onDownload(file)} disabled={downloadingId === file.id}>
               下载
             </Button>
-            <Button size="small" onClick={() => onShare(file)}>
+            <Button size="small" startIcon={<ShareLineIcon fontSize="small" />} onClick={() => onShare(file)}>
               分享
             </Button>
           </>
@@ -81,7 +80,16 @@ export function FilesListTable({ section, items, recommendedFiles, recentGroups,
       </TableHead>
       <TableBody>
         {section === 'recent'
-          ? ([['今天', recentGroups.today], ['上个月', recentGroups.lastMonth], ['更早', recentGroups.earlier]] as Array<[string, FileItem[]]>).map(([label, group]) => (
+          ? (
+              [
+                ['今天', recentGroups.today],
+                ['过去 7 天', recentGroups.past7Days],
+                ['过去 30 天', recentGroups.past30Days],
+                ['今年', recentGroups.thisYear],
+                ['去年', recentGroups.lastYear],
+                ['更早', recentGroups.earlier],
+              ] as Array<[string, FileItem[]]>
+            ).map(([label, group]) => (
               <Fragment key={label}>
                 {group.length > 0 && (
                   <TableRow>
@@ -95,7 +103,7 @@ export function FilesListTable({ section, items, recommendedFiles, recentGroups,
                 {renderRows(group)}
               </Fragment>
             ))
-          : renderRows(section === 'home' ? recommendedFiles : items)}
+          : renderRows(items)}
       </TableBody>
     </Table>
   )
