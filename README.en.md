@@ -1,5 +1,7 @@
 # YourCloud
 
+[![中文](https://img.shields.io/badge/语言-中文-red)](./README.md)
+
 ## Overview
 
 YourCloud is an open-source cloud drive for everyone: no speed limits, cross-platform, and built for long-term reliability.  

@@ -1,5 +1,7 @@
 # YourCloud
 
+[![English](https://img.shields.io/badge/Language-English-blue)](./README.en.md)
+
 ## 项目简介
 
 YourCloud 是一个写给所有人的开源云盘：不限速、跨平台、稳定可靠。  
