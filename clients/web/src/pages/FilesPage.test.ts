@@ -3,6 +3,8 @@ import {
   deriveDriveItems,
   canDownloadFile,
   formatDisplayFileSize,
+  getDefaultViewModeForSection,
+  shouldUseTopRightViewSwitch,
   getDeleteDialogDescription,
   getDeleteDialogTitle,
   getDeleteFeedbackText,
@@ -17,10 +19,26 @@ describe('FilesPage helpers', () => {
     expect(shouldShowCreateActions('trash')).toBe(false)
   })
 
-  it('shows create actions only in drive and starred sections', () => {
+  it('shows create actions only in drive section', () => {
     expect(shouldShowCreateActions('drive')).toBe(true)
-    expect(shouldShowCreateActions('starred')).toBe(true)
+    expect(shouldShowCreateActions('starred')).toBe(false)
     expect(shouldShowCreateActions('recent')).toBe(false)
+  })
+
+  it('defaults home/drive/recent/starred panels to list view', () => {
+    expect(getDefaultViewModeForSection('home')).toBe('list')
+    expect(getDefaultViewModeForSection('recent')).toBe('list')
+    expect(getDefaultViewModeForSection('starred')).toBe('list')
+    expect(getDefaultViewModeForSection('drive')).toBe('list')
+    expect(getDefaultViewModeForSection('trash')).toBe('grid')
+  })
+
+  it('uses top-right view switch for home/drive/recent/starred panels', () => {
+    expect(shouldUseTopRightViewSwitch('home')).toBe(true)
+    expect(shouldUseTopRightViewSwitch('drive')).toBe(true)
+    expect(shouldUseTopRightViewSwitch('recent')).toBe(true)
+    expect(shouldUseTopRightViewSwitch('starred')).toBe(true)
+    expect(shouldUseTopRightViewSwitch('trash')).toBe(false)
   })
 
   it('returns folder-specific delete dialog copy', () => {

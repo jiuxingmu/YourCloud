@@ -36,8 +36,16 @@ type Props = { searchQuery?: string; section?: Section }
 type TypeFilter = 'all' | 'doc' | 'sheet' | 'slide' | 'image' | 'pdf' | 'video' | 'archive' | 'audio'
 type TimeFilter = 'all' | 'today' | '7d' | '30d' | 'thisYear' | 'lastYear'
 
+export function getDefaultViewModeForSection(section: Section): 'grid' | 'list' {
+  return section === 'home' || section === 'drive' || section === 'recent' || section === 'starred' ? 'list' : 'grid'
+}
+
+export function shouldUseTopRightViewSwitch(section: Section): boolean {
+  return section === 'home' || section === 'drive' || section === 'recent' || section === 'starred'
+}
+
 export function shouldShowCreateActions(section: Section): boolean {
-  return section === 'drive' || section === 'starred'
+  return section === 'drive'
 }
 
 export function getDeleteDialogTitle(file: FileItem | null): string {
@@ -413,7 +421,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
   const [loading, setLoading] = useState(false)
   const [downloadingId, setDownloadingId] = useState<number | null>(null)
   const [shareLink, setShareLink] = useState('')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => getDefaultViewModeForSection(section))
   const [actionAnchor, setActionAnchor] = useState<null | HTMLElement>(null)
   const [actionFile, setActionFile] = useState<FileItem | null>(null)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
@@ -491,6 +499,10 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
 
   useEffect(() => {
     if (section !== 'drive') setCurrentDrivePath('')
+  }, [section])
+
+  useEffect(() => {
+    setViewMode(getDefaultViewModeForSection(section))
   }, [section])
 
   async function upload(file: File) {
@@ -782,6 +794,19 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
       </IconButton>
     </Box>
   )
+  const filterAndViewControls = (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+      <Stack direction="row" spacing={1}>
+        <Button size="small" variant="outlined" aria-label="打开类型筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('type', e)}>
+          类型
+        </Button>
+        <Button size="small" variant="outlined" aria-label="打开修改时间筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('time', e)}>
+          修改时间
+        </Button>
+      </Stack>
+      {shouldUseTopRightViewSwitch(section) ? viewSwitch : null}
+    </Box>
+  )
   const unifiedTableSx = {
     tableLayout: 'fixed',
     '& .MuiTableCell-root': {
@@ -963,7 +988,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
     <Box sx={{ display: 'grid', gap: 2.5 }}>
       <Paper variant="outlined" sx={{ borderRadius: 0, p: 2, borderColor: '#dfe3e8', backgroundColor: '#fff' }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { xs: 'stretch', sm: 'center' }, mb: 2 }}>
-          {(section !== 'home' || section === 'trash') && (
+          {(section === 'drive' || section === 'trash') && (
             <>
               {shouldShowCreateActions(section) && (
                 <>
@@ -976,9 +1001,11 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
                   </Button>
                 </>
               )}
-              <Button variant="outlined" startIcon={<RefreshLineIcon />} onClick={load} disabled={loading}>
-                刷新
-              </Button>
+              {section !== 'recent' && (
+                <Button variant="outlined" startIcon={<RefreshLineIcon />} onClick={load} disabled={loading}>
+                  刷新
+                </Button>
+              )}
             </>
           )}
         </Stack>
@@ -1013,7 +1040,7 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                 <Typography sx={{ fontWeight: 600 }}>建议的文件</Typography>
-                {viewSwitch}
+                {shouldUseTopRightViewSwitch(section) ? viewSwitch : null}
               </Box>
               {viewMode === 'grid' ? renderGridView : renderListView}
             </Box>
@@ -1056,94 +1083,86 @@ export default function FilesPage({ searchQuery = '', section = 'home' }: Props)
         ) : section === 'recent' ? (
           <Box sx={{ display: 'grid', gap: 2 }}>
             <Typography sx={{ fontSize: 36, fontWeight: 500 }}>最近用过</Typography>
-            <Stack direction="row" spacing={1}>
-              <Button size="small" variant="outlined" aria-label="打开类型筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('type', e)}>
-                类型
-              </Button>
-              <Button size="small" variant="outlined" aria-label="打开修改时间筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('time', e)}>
-                修改时间
-              </Button>
-              <Box sx={{ ml: 'auto' }}>{viewSwitch}</Box>
-            </Stack>
+            {filterAndViewControls}
             {viewMode === 'grid' ? renderGridView : renderListView}
           </Box>
         ) : section === 'drive' ? (
           <Box sx={{ display: 'grid', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Button size="large" onClick={() => setCurrentDrivePath('')} sx={{ fontSize: 46, fontWeight: 500, px: 0, minWidth: 0, lineHeight: 1 }}>
-                我的云端硬盘
-              </Button>
-              {currentDrivePath && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: 'text.secondary' }}>
-                  <Typography sx={{ fontSize: 40, lineHeight: 1 }}>›</Typography>
-                  {currentDrivePath.split('/').map((segment, idx, arr) => {
-                    const path = arr.slice(0, idx + 1).join('/')
-                    const isLast = idx === arr.length - 1
-                    return (
-                      <Button key={path} size="large" onClick={() => setCurrentDrivePath(path)} disabled={isLast} sx={{ px: 0.5, minWidth: 0, fontSize: 40, fontWeight: isLast ? 500 : 400, lineHeight: 1 }}>
-                        {segment}
-                      </Button>
-                    )
-                  })}
-                </Box>
-              )}
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Button size="large" onClick={() => setCurrentDrivePath('')} sx={{ fontSize: 46, fontWeight: 500, px: 0, minWidth: 0, lineHeight: 1 }}>
+                  我的云端硬盘
+                </Button>
+                {currentDrivePath && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: 'text.secondary' }}>
+                    <Typography sx={{ fontSize: 40, lineHeight: 1 }}>›</Typography>
+                    {currentDrivePath.split('/').map((segment, idx, arr) => {
+                      const path = arr.slice(0, idx + 1).join('/')
+                      const isLast = idx === arr.length - 1
+                      return (
+                        <Button key={path} size="large" onClick={() => setCurrentDrivePath(path)} disabled={isLast} sx={{ px: 0.5, minWidth: 0, fontSize: 40, fontWeight: isLast ? 500 : 400, lineHeight: 1 }}>
+                          {segment}
+                        </Button>
+                      )
+                    })}
+                  </Box>
+                )}
+              </Box>
             </Box>
-            <Stack direction="row" spacing={1}>
-              <Button size="small" variant="outlined" aria-label="打开类型筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('type', e)}>
-                类型
-              </Button>
-              <Button size="small" variant="outlined" aria-label="打开修改时间筛选菜单" endIcon={<ArrowDownIcon fontSize="small" />} onClick={(e) => openFilterMenu('time', e)}>
-                修改时间
-              </Button>
-              <Box sx={{ ml: 'auto' }}>{viewSwitch}</Box>
-            </Stack>
+            {filterAndViewControls}
             {viewMode === 'grid' ? renderGridView : renderListView}
           </Box>
         ) : viewMode === 'grid' ? (
-          renderGridView
+          <Box sx={{ display: 'grid', gap: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>{shouldUseTopRightViewSwitch(section) ? viewSwitch : null}</Box>
+            {renderGridView}
+          </Box>
         ) : (
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>名称</TableCell>
-                <TableCell>大小</TableCell>
-                <TableCell align="right">操作</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredFiles.map((file) => (
-                <TableRow key={file.id} hover>
-                  <TableCell sx={{ maxWidth: 460 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <FileTypeBadge file={file} />
-                      <Typography noWrap>{file.filename}</Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{formatDisplayFileSize(file)}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {formatModified(file.updatedAt ?? file.createdAt)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    {canDownloadFile(file) && (
-                      <>
-                        <Button size="small" startIcon={<DownloadLineIcon />} onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
-                          下载
-                        </Button>
-                        <Button size="small" startIcon={<ShareLineIcon />} onClick={() => createShare(file)}>
-                          分享
-                        </Button>
-                      </>
-                    )}
-                    <IconButton size="small" aria-label={`打开文件操作菜单：${getBaseName(file.filename)}`} onClick={(e) => openActionMenu(e, file)}>
-                      <MoreIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
+          <Box sx={{ display: 'grid', gap: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>{shouldUseTopRightViewSwitch(section) ? viewSwitch : null}</Box>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>名称</TableCell>
+                  <TableCell>大小</TableCell>
+                  <TableCell align="right">操作</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {filteredFiles.map((file) => (
+                  <TableRow key={file.id} hover>
+                    <TableCell sx={{ maxWidth: 460 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FileTypeBadge file={file} />
+                        <Typography noWrap>{file.filename}</Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{formatDisplayFileSize(file)}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatModified(file.updatedAt ?? file.createdAt)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      {canDownloadFile(file) && (
+                        <>
+                          <Button size="small" startIcon={<DownloadLineIcon />} onClick={() => downloadFile(file)} disabled={downloadingId === file.id}>
+                            下载
+                          </Button>
+                          <Button size="small" startIcon={<ShareLineIcon />} onClick={() => createShare(file)}>
+                            分享
+                          </Button>
+                        </>
+                      )}
+                      <IconButton size="small" aria-label={`打开文件操作菜单：${getBaseName(file.filename)}`} onClick={(e) => openActionMenu(e, file)}>
+                        <MoreIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
         )}
 
         {shareLink && (
