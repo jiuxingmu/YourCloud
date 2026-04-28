@@ -123,6 +123,9 @@ func (s FileService) MoveByOwner(ownerID, fileID uint, nextFilename string) (*mo
 		}
 		oldPrefix := normalizePath(current.Filename)
 		newPrefix := normalizePath(name)
+		if isSameOrChildPath(newPrefix, oldPrefix) && newPrefix != oldPrefix {
+			return nil, gorm.ErrInvalidData
+		}
 		for _, item := range files {
 			if !isSameOrChildPath(item.Filename, oldPrefix) {
 				continue

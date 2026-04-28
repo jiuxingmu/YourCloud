@@ -16,6 +16,9 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err := config.ValidateJWTSecret(cfg.JWTSecret); err != nil {
+		log.Fatalf("invalid JWT configuration: %v", err)
+	}
 	database, err := db.Connect(cfg.DBURL)
 	if err != nil {
 		log.Fatalf("failed to connect db: %v", err)

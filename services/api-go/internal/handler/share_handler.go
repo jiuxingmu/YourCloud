@@ -19,6 +19,17 @@ type ShareHandler struct {
 	FileRepo  repo.FileRepo
 }
 
+func trustedBaseURL(c *gin.Context) string {
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	if forwardedProto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")); forwardedProto != "" {
+		scheme = forwardedProto
+	}
+	return scheme + "://" + c.Request.Host
+}
+
 type createShareReq struct {
 	FileID      uint `json:"fileId"`
 	ExpireHours int  `json:"expireHours"`
@@ -45,10 +56,7 @@ func (h ShareHandler) Create(c *gin.Context) {
 		c.JSON(status, gin.H{"error": gin.H{"code": "SHARE_FAILED", "message": err.Error()}})
 		return
 	}
-	baseURL := c.Request.Header.Get("Origin")
-	if strings.TrimSpace(baseURL) == "" {
-		baseURL = "http://" + c.Request.Host
-	}
+	baseURL := trustedBaseURL(c)
 	c.JSON(http.StatusCreated, gin.H{"data": gin.H{
 		"token":       s.Token,
 		"url":         baseURL + "/share/" + s.Token,

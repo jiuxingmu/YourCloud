@@ -14,9 +14,10 @@ export function getRelativeBucket(value?: string): 'today' | 'lastMonth' | 'earl
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'earlier'
   const now = new Date()
+  if (date.getTime() > now.getTime()) return 'earlier'
   if (date.toDateString() === now.toDateString()) return 'today'
   const monthDiff = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth())
-  if (monthDiff <= 1) return 'lastMonth'
+  if (monthDiff >= 0 && monthDiff <= 1) return 'lastMonth'
   return 'earlier'
 }
 
@@ -42,6 +43,7 @@ export function matchesTimeFilter(file: FileItem, timeFilter: TimeFilter): boole
   if (Number.isNaN(date.getTime())) return false
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
+  if (diffMs < 0) return false
   if (timeFilter === 'today') return date.toDateString() === now.toDateString()
   if (timeFilter === '7d') return diffMs <= 7 * 24 * 3600 * 1000
   if (timeFilter === '30d') return diffMs <= 30 * 24 * 3600 * 1000

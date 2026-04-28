@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"yourcloud/backend-go/internal/model"
 	"yourcloud/backend-go/internal/repo"
@@ -40,6 +43,11 @@ func setupShareHandlerTest(t *testing.T) (*gin.Engine, model.File, model.Share) 
 		FileRepo:  repo.FileRepo{DB: db},
 	}
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("userID", uint(1))
+		c.Next()
+	})
+	router.POST("/shares", h.Create)
 	router.GET("/shares/:token", h.GetByToken)
 	router.GET("/shares/:token/download", h.DownloadByToken)
 	return router, file, share
@@ -78,5 +86,26 @@ func TestShareHandlerDownloadByTokenRejectsWrongExtractCode(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403 for wrong extract code, got %d", w.Code)
+	}
+}
+
+func TestShareHandlerCreateIgnoresUntrustedOrigin(t *testing.T) {
+	router, file, _ := setupShareHandlerTest(t)
+	body := []byte(fmt.Sprintf(`{"fileId":%d,"expireHours":24}`, file.ID))
+	req := httptest.NewRequest(http.MethodPost, "/shares", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://evil.example")
+	req.Host = "api.safe.local"
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 when creating share, got %d", w.Code)
+	}
+	if got := w.Body.String(); got == "" || !strings.Contains(got, "http://api.safe.local/share/") {
+		t.Fatalf("expected response url to use request host, got %s", got)
+	}
+	if strings.Contains(w.Body.String(), "evil.example") {
+		t.Fatalf("expected response to ignore untrusted origin, got %s", w.Body.String())
 	}
 }

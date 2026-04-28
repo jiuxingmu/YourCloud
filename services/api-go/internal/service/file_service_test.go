@@ -188,3 +188,32 @@ func TestFileServiceDeleteByOwnerDeletesFolderDescendants(t *testing.T) {
 		t.Fatalf("expected unrelated file data to remain, got %v", err)
 	}
 }
+
+func TestFileServiceMoveByOwnerRejectsMovingFolderIntoOwnDescendant(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.File{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	items := []model.File{
+		{OwnerID: 1, Filename: "projects", StoredPath: "projects", MimeType: "inode/directory"},
+		{OwnerID: 1, Filename: "projects/spec.md", StoredPath: "/tmp/spec.md", MimeType: "text/markdown"},
+	}
+	for i := range items {
+		if err := db.Create(&items[i]).Error; err != nil {
+			t.Fatalf("seed file %d: %v", i, err)
+		}
+	}
+
+	svc := FileService{
+		Files:   repo.FileRepo{DB: db},
+		Storage: storage.LocalStorage{BasePath: t.TempDir()},
+	}
+
+	_, err = svc.MoveByOwner(1, items[0].ID, "projects/sub")
+	if !errors.Is(err, gorm.ErrInvalidData) {
+		t.Fatalf("expected invalid data error when moving folder into own descendant, got %v", err)
+	}
+}

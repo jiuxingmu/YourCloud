@@ -27,6 +27,7 @@ fi
 echo "Starting API and Web..."
 (
   cd "$ROOT_DIR/services/api-go" || exit 1
+  export JWT_SECRET="${JWT_SECRET:-local-dev-please-change-32chars-minimum}"
   exec go run ./cmd/server
 ) &
 API_PID=$!
