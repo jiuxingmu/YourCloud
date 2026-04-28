@@ -55,7 +55,7 @@ export async function deleteFile(id: number): Promise<void> {
 
 export async function moveFile(id: number, filename: string): Promise<void> {
   await request<void>(`/api/v1/files/${id}/move`, {
-    method: 'POST',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ filename }),
   })

@@ -12,6 +12,7 @@ local.properties
 
 # Runtime / logs
 .dev/
+.tmp-*/
 *.log
 npm-debug.log*
 yarn-debug.log*

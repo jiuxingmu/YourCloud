@@ -93,7 +93,10 @@ export default function FilesPageContainer({ searchQuery = '', section = 'home' 
     lastMonth: filteredFiles.filter((file) => getRelativeBucket(file.updatedAt ?? file.createdAt) === 'lastMonth'),
     earlier: filteredFiles.filter((file) => getRelativeBucket(file.updatedAt ?? file.createdAt) === 'earlier'),
   }
-  const recommendedFiles = [...files].sort((a, b) => +new Date(b.updatedAt ?? b.createdAt ?? 0) - +new Date(a.updatedAt ?? a.createdAt ?? 0)).slice(0, 4)
+  const recommendedFiles = [...files]
+    .filter((file) => file.mimeType !== 'inode/directory')
+    .sort((a, b) => +new Date(b.updatedAt ?? b.createdAt ?? 0) - +new Date(a.updatedAt ?? a.createdAt ?? 0))
+    .slice(0, 4)
   const recommendedFolder = files.find((file) => file.filename.includes('/'))?.filename.split('/')[0] || (files[0]?.filename.replace(/\.[^/.]+$/, '') || '示例文件夹')
   const moveFolderOptions = Array.from(
     files.reduce((acc, file) => {
