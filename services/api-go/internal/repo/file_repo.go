@@ -33,3 +33,13 @@ func (r FileRepo) FindByIDForOwner(id, ownerID uint) (*model.File, error) {
 	}
 	return &f, nil
 }
+
+func (r FileRepo) DeleteByIDForOwner(id, ownerID uint) error {
+	return r.DB.Where("id = ? AND owner_id = ?", id, ownerID).Delete(&model.File{}).Error
+}
+
+func (r FileRepo) UpdateFilenameByIDForOwner(id, ownerID uint, filename string) error {
+	return r.DB.Model(&model.File{}).
+		Where("id = ? AND owner_id = ?", id, ownerID).
+		Update("filename", filename).Error
+}

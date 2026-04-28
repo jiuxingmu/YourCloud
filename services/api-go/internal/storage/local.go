@@ -1,10 +1,12 @@
 package storage
 
 import (
+	"errors"
 	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -20,6 +22,23 @@ func (s LocalStorage) Name() string {
 func (s LocalStorage) Exists(storedPath string) error {
 	_, err := os.Stat(storedPath)
 	return err
+}
+
+func (s LocalStorage) Delete(storedPath string) error {
+	return os.Remove(storedPath)
+}
+
+func (s LocalStorage) CreateFolder(folderPath string) error {
+	clean := filepath.Clean(strings.TrimSpace(folderPath))
+	if clean == "." || clean == "" || strings.HasPrefix(clean, "..") || filepath.IsAbs(clean) {
+		return errors.New("invalid folder path")
+	}
+	target := filepath.Join(s.BasePath, clean)
+	baseClean := filepath.Clean(s.BasePath)
+	if !strings.HasPrefix(target, baseClean+string(filepath.Separator)) && target != baseClean {
+		return errors.New("invalid folder path")
+	}
+	return os.MkdirAll(target, 0o755)
 }
 
 func (s LocalStorage) Save(fileHeader *multipart.FileHeader) (string, int64, error) {

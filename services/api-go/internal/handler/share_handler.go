@@ -2,8 +2,10 @@ package handler
 
 import (
 	"net/http"
+	"os"
 	"strconv"
 	"time"
+	"yourcloud/backend-go/internal/preview"
 	"yourcloud/backend-go/internal/repo"
 	"yourcloud/backend-go/internal/service"
 
@@ -60,6 +62,61 @@ func (h ShareHandler) GetByToken(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"token": token, "file": f, "share": gin.H{"id": s.ID, "fileId": s.FileID, "expiresAt": s.ExpiresAt}}})
+}
+
+func (h ShareHandler) DownloadByToken(c *gin.Context) {
+	token := c.Param("token")
+	s, err := h.ShareRepo.FindByToken(token)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "share not found"}})
+		return
+	}
+	if s.ExpiresAt != nil && s.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusGone, gin.H{"error": gin.H{"code": "EXPIRED", "message": "share expired"}})
+		return
+	}
+	f, err := h.FileRepo.FindByID(s.FileID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "file not found"}})
+		return
+	}
+	if _, err := os.Stat(f.StoredPath); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "file data missing"}})
+		return
+	}
+	if f.MimeType != "" {
+		c.Header("Content-Type", f.MimeType)
+	}
+	c.FileAttachment(f.StoredPath, f.Filename)
+}
+
+func (h ShareHandler) ThumbnailByToken(c *gin.Context) {
+	token := c.Param("token")
+	s, err := h.ShareRepo.FindByToken(token)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "share not found"}})
+		return
+	}
+	if s.ExpiresAt != nil && s.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusGone, gin.H{"error": gin.H{"code": "EXPIRED", "message": "share expired"}})
+		return
+	}
+	f, err := h.FileRepo.FindByID(s.FileID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "file not found"}})
+		return
+	}
+	if _, err := os.Stat(f.StoredPath); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "file data missing"}})
+		return
+	}
+	out, err := preview.CreateJPEGThumbnail(f.StoredPath, 720, 450)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": gin.H{"code": "NOT_IMAGE", "message": "thumbnail only supports images"}})
+		return
+	}
+	c.Header("Cache-Control", "public, max-age=86400")
+	c.Data(http.StatusOK, "image/jpeg", out)
 }
 
 func ParseUintParam(raw string) uint {

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material'
+import { useState, type ChangeEvent, type FormEvent, type SyntheticEvent } from 'react'
+import { Alert, Avatar, Box, Button, Card, CardContent, Divider, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@mui/material'
 import { request } from '../apiClient'
 
 type Props = { onSuccess: () => void }
@@ -7,19 +7,34 @@ type Props = { onSuccess: () => void }
 export default function LoginPage({ onSuccess }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState<'login' | 'register' | null>(null)
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-  async function submit(path: '/api/v1/auth/login' | '/api/v1/auth/register') {
-    setError('')
-    setMessage('')
-    setLoading(path === '/api/v1/auth/login' ? 'login' : 'register')
+  async function submit() {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail || !password) {
+      setFeedback({ type: 'error', text: 'Email and password are required.' })
+      return
+    }
+    if (!emailPattern.test(normalizedEmail)) {
+      setFeedback({ type: 'error', text: 'Please enter a valid email address.' })
+      return
+    }
+    if (mode === 'register' && password.length < 6) {
+      setFeedback({ type: 'error', text: 'Password must be at least 6 characters for registration.' })
+      return
+    }
+
+    const path = mode === 'login' ? '/api/v1/auth/login' : '/api/v1/auth/register'
+    setFeedback(null)
+    setLoading(true)
     try {
       const data = await request<{ token?: string }>(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       })
       if (data.token) {
         localStorage.setItem('token', data.token)
@@ -28,62 +43,104 @@ export default function LoginPage({ onSuccess }: Props) {
       }
 
       if (path === '/api/v1/auth/register') {
-        setMessage('Register success, logging you in...')
+        setFeedback({ type: 'success', text: 'Register success, logging you in...' })
         const loginData = await request<{ token?: string }>('/api/v1/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email: normalizedEmail, password }),
         })
         if (loginData.token) {
           localStorage.setItem('token', loginData.token)
           onSuccess()
           return
         }
-        setMessage('Register success. Please click Login.')
+        setFeedback({ type: 'success', text: 'Register success. Please switch to Login to continue.' })
       }
     } catch (e) {
-      setError((e as Error).message)
+      setFeedback({ type: 'error', text: (e as Error).message })
     } finally {
-      setLoading(null)
+      setLoading(false)
     }
   }
 
-  return (
-    <Box sx={{ display: 'grid', placeItems: 'center', minHeight: '70vh' }}>
-      <Card sx={{ width: '100%', maxWidth: 520, boxShadow: '0 10px 30px rgba(17,24,39,0.08)' }}>
-        <CardContent sx={{ p: 4 }}>
-          <Stack spacing={2.5}>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-                Welcome Back
-              </Typography>
-              <Typography color="text.secondary">Login or create a new account to manage your cloud files.</Typography>
-            </Box>
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void submit()
+  }
 
-            <TextField label="Email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth />
+  return (
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        px: { xs: 2, sm: 3 },
+        py: 3,
+      }}
+    >
+      <Card
+        sx={{
+          width: '100%',
+          maxWidth: 760,
+          borderRadius: 0,
+          border: '1px solid #e0e3e7',
+          boxShadow: 'none',
+        }}
+      >
+        <CardContent component="form" onSubmit={handleSubmit} sx={{ p: { xs: 3, sm: 5 } }}>
+          <Stack spacing={2.5}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+              <Avatar sx={{ width: 32, height: 32, bgcolor: '#1a73e8', fontSize: 15 }}>云</Avatar>
+              <Typography sx={{ fontSize: 20, fontWeight: 500 }}>登录 YourCloud</Typography>
+            </Box>
+            <Typography color="text.secondary" sx={{ fontSize: 14 }}>
+              使用你的账号访问云端硬盘
+            </Typography>
+
+            <Tabs
+              value={mode}
+              onChange={(_e: SyntheticEvent, value: 'login' | 'register') => {
+                setMode(value)
+                setFeedback(null)
+              }}
+              variant="fullWidth"
+            >
+              <Tab label="登录" value="login" />
+              <Tab label="注册" value="register" />
+            </Tabs>
+
             <TextField
-              label="Password"
+              label="电子邮箱"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="密码"
               type="password"
-              placeholder="At least 6 characters"
+              placeholder="至少 6 位"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
               fullWidth
             />
 
-            <Stack direction="row" spacing={1.5}>
-              <Button variant="contained" onClick={() => submit('/api/v1/auth/login')} disabled={!!loading}>
-                {loading === 'login' ? 'Signing in...' : 'Login'}
+            <Divider />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button variant="contained" type="submit" disabled={loading} size="large" sx={{ minWidth: 124, borderRadius: 0 }}>
+                {loading ? (mode === 'login' ? '登录中...' : '创建中...') : mode === 'login' ? '登录' : '注册'}
               </Button>
-              <Button variant="outlined" onClick={() => submit('/api/v1/auth/register')} disabled={!!loading}>
-                {loading === 'register' ? 'Creating...' : 'Register'}
-              </Button>
-            </Stack>
-
-            {message && <Alert severity="success">{message}</Alert>}
-            {error && <Alert severity="error">{error}</Alert>}
+            </Box>
           </Stack>
         </CardContent>
       </Card>
+      <Snackbar open={Boolean(feedback)} autoHideDuration={4000} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        {feedback ? (
+          <Alert onClose={() => setFeedback(null)} severity={feedback.type} variant="filled" sx={{ width: '100%' }}>
+            {feedback.text}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Box>
   )
 }

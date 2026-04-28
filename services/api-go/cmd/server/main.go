@@ -55,12 +55,18 @@ func main() {
 	auth.POST("/login", authHandler.Login)
 
 	v1.GET("/shares/:token", shareHandler.GetByToken)
+	v1.GET("/shares/:token/download", shareHandler.DownloadByToken)
+	v1.GET("/shares/:token/thumbnail", shareHandler.ThumbnailByToken)
 
 	protected := v1.Group("")
 	protected.Use(middleware.Auth(cfg.JWTSecret))
 	protected.POST("/files", fileHandler.Upload)
+	protected.POST("/files/folders", fileHandler.CreateFolder)
 	protected.GET("/files", fileHandler.List)
 	protected.GET("/files/:id/download", fileHandler.Download)
+	protected.GET("/files/:id/thumbnail", fileHandler.Thumbnail)
+	protected.DELETE("/files/:id", fileHandler.Delete)
+	protected.PATCH("/files/:id/move", fileHandler.Move)
 	protected.POST("/shares", shareHandler.Create)
 
 	log.Printf("backend listening on :%s", cfg.Port)

@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"yourcloud/backend-go/internal/model"
 	"yourcloud/backend-go/internal/repo"
@@ -46,5 +48,24 @@ func TestFileServiceFindDownloadByOwner(t *testing.T) {
 	_, err = svc.FindDownloadByOwner(2, ownerFile.ID)
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("expected record not found for non-owner, got %v", err)
+	}
+}
+
+func TestFileServiceCreateFolder(t *testing.T) {
+	basePath := t.TempDir()
+	svc := FileService{
+		Storage: storage.LocalStorage{BasePath: basePath},
+	}
+
+	if err := svc.CreateFolder(1, "projects/demo"); err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(basePath, "projects/demo")); err != nil {
+		t.Fatalf("expected folder created: %v", err)
+	}
+
+	if err := svc.CreateFolder(1, "../escape"); err == nil {
+		t.Fatalf("expected invalid folder path error")
 	}
 }

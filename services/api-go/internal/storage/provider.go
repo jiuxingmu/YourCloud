@@ -9,6 +9,8 @@ import (
 type Provider interface {
 	Save(fileHeader *multipart.FileHeader) (string, int64, error)
 	Exists(storedPath string) error
+	Delete(storedPath string) error
+	CreateFolder(folderPath string) error
 	Name() string
 }
 
@@ -21,6 +23,14 @@ func (p unsupportedProvider) Save(_ *multipart.FileHeader) (string, int64, error
 }
 
 func (p unsupportedProvider) Exists(_ string) error {
+	return fmt.Errorf("unsupported storage provider: %s", p.kind)
+}
+
+func (p unsupportedProvider) Delete(_ string) error {
+	return fmt.Errorf("unsupported storage provider: %s", p.kind)
+}
+
+func (p unsupportedProvider) CreateFolder(_ string) error {
 	return fmt.Errorf("unsupported storage provider: %s", p.kind)
 }
 
