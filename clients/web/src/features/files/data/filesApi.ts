@@ -23,6 +23,21 @@ export function buildShareThumbnailUrl(token: string): string {
   return `${API_BASE_URL}/api/v1/shares/${token}/thumbnail`
 }
 
+function withExtractCode(url: string, extractCode?: string): string {
+  const code = extractCode?.trim()
+  if (!code) return url
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}extractCode=${encodeURIComponent(code)}`
+}
+
+export function buildShareDownloadUrlWithCode(token: string, extractCode?: string): string {
+  return withExtractCode(buildShareDownloadUrl(token), extractCode)
+}
+
+export function buildShareThumbnailUrlWithCode(token: string, extractCode?: string): string {
+  return withExtractCode(buildShareThumbnailUrl(token), extractCode)
+}
+
 export async function listFiles(): Promise<FileItem[]> {
   return await request<FileItem[]>('/api/v1/files', { headers: { ...authHeaders() } })
 }
@@ -62,6 +77,7 @@ export async function createShare(fileId: number, expireHours = 72, extractCode 
   })
 }
 
-export async function getShare(token: string): Promise<{ file: { filename: string; id: number; mimeType?: string } }> {
-  return await request<{ file: { filename: string; id: number; mimeType?: string } }>(`/api/v1/shares/${token}`)
+export async function getShare(token: string, extractCode?: string): Promise<{ file: { filename: string; id: number; mimeType?: string } }> {
+  const path = withExtractCode(`/api/v1/shares/${token}`, extractCode)
+  return await request<{ file: { filename: string; id: number; mimeType?: string } }>(path)
 }

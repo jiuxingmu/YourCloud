@@ -4,6 +4,7 @@ import (
 	"errors"
 	"mime/multipart"
 	"os"
+	"sort"
 	"strings"
 	"yourcloud/backend-go/internal/model"
 	"yourcloud/backend-go/internal/repo"
@@ -28,6 +29,15 @@ func joinFolderAndFilename(folderPath, filename string) string {
 		return base
 	}
 	return folder + "/" + base
+}
+
+func isSameOrChildPath(targetPath, folderPath string) bool {
+	target := normalizePath(targetPath)
+	folder := normalizePath(folderPath)
+	if target == folder {
+		return true
+	}
+	return strings.HasPrefix(target, folder+"/")
 }
 
 func (s FileService) Upload(ownerID uint, fh *multipart.FileHeader, folderPath string) (*model.File, error) {
@@ -61,11 +71,35 @@ func (s FileService) DeleteByOwner(ownerID, fileID uint) error {
 	if err != nil {
 		return err
 	}
+	if f.MimeType == "inode/directory" {
+		files, err := s.Files.ListByOwner(ownerID)
+		if err != nil {
+			return err
+		}
+		var targets []model.File
+		for _, item := range files {
+			if isSameOrChildPath(item.Filename, f.Filename) {
+				targets = append(targets, item)
+			}
+		}
+		sort.Slice(targets, func(i, j int) bool {
+			return len(targets[i].Filename) > len(targets[j].Filename)
+		})
+		for _, item := range targets {
+			if err := s.Files.DeleteByIDForOwner(item.ID, ownerID); err != nil {
+				return err
+			}
+			if item.MimeType == "inode/directory" {
+				continue
+			}
+			if err := s.Storage.Delete(item.StoredPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		}
+		return nil
+	}
 	if err := s.Files.DeleteByIDForOwner(fileID, ownerID); err != nil {
 		return err
-	}
-	if f.MimeType == "inode/directory" {
-		return nil
 	}
 	if err := s.Storage.Delete(f.StoredPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -78,8 +112,28 @@ func (s FileService) MoveByOwner(ownerID, fileID uint, nextFilename string) (*mo
 	if name == "" {
 		return nil, gorm.ErrInvalidData
 	}
-	if _, err := s.Files.FindByIDForOwner(fileID, ownerID); err != nil {
+	current, err := s.Files.FindByIDForOwner(fileID, ownerID)
+	if err != nil {
 		return nil, err
+	}
+	if current.MimeType == "inode/directory" {
+		files, err := s.Files.ListByOwner(ownerID)
+		if err != nil {
+			return nil, err
+		}
+		oldPrefix := normalizePath(current.Filename)
+		newPrefix := normalizePath(name)
+		for _, item := range files {
+			if !isSameOrChildPath(item.Filename, oldPrefix) {
+				continue
+			}
+			suffix := strings.TrimPrefix(normalizePath(item.Filename), oldPrefix)
+			updatedName := newPrefix + suffix
+			if err := s.Files.UpdateFilenameByIDForOwner(item.ID, ownerID, updatedName); err != nil {
+				return nil, err
+			}
+		}
+		return s.Files.FindByIDForOwner(fileID, ownerID)
 	}
 	if err := s.Files.UpdateFilenameByIDForOwner(fileID, ownerID, name); err != nil {
 		return nil, err

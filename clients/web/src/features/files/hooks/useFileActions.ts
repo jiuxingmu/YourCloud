@@ -1,6 +1,6 @@
 import { useState, type MouseEvent } from 'react'
 import { createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, validateMoveTargetName, type ShareResult } from '../application/fileActionsService'
-import { getBaseName, getDeleteFeedbackText, getParentPath, normalizePath, type DeletedItem, type FileItem } from '../domain'
+import { getBaseName, getParentPath, normalizePath, type DeletedItem, type FileItem } from '../domain'
 
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
 type ErrorMessageFn = (error: unknown) => string
@@ -121,14 +121,6 @@ export function useFileActions(options: Options) {
   async function confirmDeleteFile() {
     const file = deleteTargetFile
     if (!file) return
-    if (file.mimeType === 'inode/directory') {
-      setVirtualFolders((prev) => prev.filter((f) => f.id !== file.id))
-      setFiles((prev) => prev.filter((f) => f.id !== file.id))
-      showFeedback('success', getDeleteFeedbackText(file))
-      setDeleteDialogOpen(false)
-      setDeleteTargetFile(null)
-      return
-    }
     await deleteFileService(file, deletedItems, persistDeleted, load, showFeedback, toErrorMessage)
     setDeleteDialogOpen(false)
     setDeleteTargetFile(null)
@@ -147,15 +139,6 @@ export function useFileActions(options: Options) {
     const basename = getBaseName(file.filename)
     const nextName = validateMoveTargetName(destinationFolder ? `${destinationFolder}/${basename}` : basename)
     if (!nextName) return
-    if (file.mimeType === 'inode/directory') {
-      setVirtualFolders((prev) => prev.map((f) => (f.id === file.id ? { ...f, filename: nextName, updatedAt: new Date().toISOString() } : f)))
-      setFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, filename: nextName, updatedAt: new Date().toISOString() } : f)))
-      showFeedback('success', `已移动：${file.filename}`)
-      setMoveDialogOpen(false)
-      setMoveTargetFile(null)
-      setMoveTargetFolderPath('')
-      return
-    }
     await moveFileService(file, nextName, load, showFeedback, toErrorMessage)
     setMoveDialogOpen(false)
     setMoveTargetFile(null)

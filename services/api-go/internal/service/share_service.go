@@ -15,6 +15,8 @@ type ShareService struct {
 	Files  repo.FileRepo
 }
 
+var ErrInvalidExtractCode = errors.New("invalid extract code")
+
 func newShareToken() string {
 	return strings.ReplaceAll(uuid.NewString(), "-", "")
 }
@@ -48,9 +50,22 @@ func (s ShareService) CreateWithOptions(userID, fileID uint, expireHours int, pa
 		t := time.Now().Add(time.Duration(expireHours) * time.Hour)
 		expiresAt = &t
 	}
-	share := &model.Share{Token: newShareToken(), FileID: fileID, CreatedBy: userID, ExpiresAt: expiresAt, Passcode: passcode}
+	share := &model.Share{Token: newShareToken(), FileID: fileID, CreatedBy: userID, ExpiresAt: expiresAt, Passcode: strings.TrimSpace(passcode)}
 	if err := s.Shares.Create(share); err != nil {
 		return nil, err
 	}
 	return share, nil
+}
+
+func (s ShareService) ValidateExtractCode(share *model.Share, providedCode string) error {
+	if share == nil {
+		return errors.New("share not found")
+	}
+	if strings.TrimSpace(share.Passcode) == "" {
+		return nil
+	}
+	if strings.TrimSpace(providedCode) != strings.TrimSpace(share.Passcode) {
+		return ErrInvalidExtractCode
+	}
+	return nil
 }

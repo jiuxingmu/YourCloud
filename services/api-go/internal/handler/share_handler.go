@@ -59,9 +59,14 @@ func (h ShareHandler) Create(c *gin.Context) {
 
 func (h ShareHandler) GetByToken(c *gin.Context) {
 	token := c.Param("token")
+	extractCode := strings.TrimSpace(c.Query("extractCode"))
 	s, err := h.ShareRepo.FindByToken(token)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "share not found"}})
+		return
+	}
+	if err := (service.ShareService{}).ValidateExtractCode(s, extractCode); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "EXTRACT_CODE_INVALID", "message": "extract code invalid"}})
 		return
 	}
 	if s.ExpiresAt != nil && s.ExpiresAt.Before(time.Now()) {
@@ -78,9 +83,14 @@ func (h ShareHandler) GetByToken(c *gin.Context) {
 
 func (h ShareHandler) DownloadByToken(c *gin.Context) {
 	token := c.Param("token")
+	extractCode := strings.TrimSpace(c.Query("extractCode"))
 	s, err := h.ShareRepo.FindByToken(token)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "share not found"}})
+		return
+	}
+	if err := (service.ShareService{}).ValidateExtractCode(s, extractCode); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "EXTRACT_CODE_INVALID", "message": "extract code invalid"}})
 		return
 	}
 	if s.ExpiresAt != nil && s.ExpiresAt.Before(time.Now()) {
@@ -104,9 +114,14 @@ func (h ShareHandler) DownloadByToken(c *gin.Context) {
 
 func (h ShareHandler) ThumbnailByToken(c *gin.Context) {
 	token := c.Param("token")
+	extractCode := strings.TrimSpace(c.Query("extractCode"))
 	s, err := h.ShareRepo.FindByToken(token)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "share not found"}})
+		return
+	}
+	if err := (service.ShareService{}).ValidateExtractCode(s, extractCode); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "EXTRACT_CODE_INVALID", "message": "extract code invalid"}})
 		return
 	}
 	if s.ExpiresAt != nil && s.ExpiresAt.Before(time.Now()) {

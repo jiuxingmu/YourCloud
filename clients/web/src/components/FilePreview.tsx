@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Typography } from '@mui/material'
 import { authHeaders } from '../apiClient'
-import { buildFileDownloadUrl, buildFileThumbnailUrl, buildShareDownloadUrl, buildShareThumbnailUrl } from '../features/files/data/filesApi'
+import { buildFileDownloadUrl, buildFileThumbnailUrl, buildShareDownloadUrlWithCode, buildShareThumbnailUrlWithCode } from '../features/files/data/filesApi'
 import { classifyPreviewKind, extensionOf } from './filePreviewKind'
 
-type PreviewSource = { id: number; filename: string; mimeType?: string; shareToken?: string; lazy?: boolean }
+type PreviewSource = { id: number; filename: string; mimeType?: string; shareToken?: string; shareExtractCode?: string; lazy?: boolean }
 
 export function shouldFetchPreviewSource(id: number, mimeType?: string): boolean {
   if (mimeType === 'inode/directory') return false
@@ -47,7 +47,7 @@ async function maybeReadText(blob: Blob): Promise<string> {
   return sample
 }
 
-export default function FilePreview({ id, filename, mimeType, shareToken, lazy = false }: PreviewSource) {
+export default function FilePreview({ id, filename, mimeType, shareToken, shareExtractCode, lazy = false }: PreviewSource) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [visible, setVisible] = useState(!lazy)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -92,8 +92,8 @@ export default function FilePreview({ id, filename, mimeType, shareToken, lazy =
       setPreviewUrl('')
       setTextPreview('')
       try {
-        const downloadUrl = shareToken ? buildShareDownloadUrl(shareToken) : buildFileDownloadUrl(id)
-        const thumbnailUrl = shareToken ? buildShareThumbnailUrl(shareToken) : buildFileThumbnailUrl(id)
+        const downloadUrl = shareToken ? buildShareDownloadUrlWithCode(shareToken, shareExtractCode) : buildFileDownloadUrl(id)
+        const thumbnailUrl = shareToken ? buildShareThumbnailUrlWithCode(shareToken, shareExtractCode) : buildFileThumbnailUrl(id)
         const headers = shareToken ? {} : authHeaders()
         const targetUrl = kind === 'image' ? thumbnailUrl : downloadUrl
         const res = await fetch(targetUrl, { headers })
@@ -125,7 +125,7 @@ export default function FilePreview({ id, filename, mimeType, shareToken, lazy =
       disposed = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [id, kind, mimeType, shareToken, visible])
+  }, [id, kind, mimeType, shareToken, shareExtractCode, visible])
 
   if (!visible) {
     return (
