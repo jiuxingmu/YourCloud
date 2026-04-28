@@ -2,9 +2,7 @@ import type { ReactNode } from 'react'
 import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material'
 import { FolderPlusIcon } from '../../../shared/icons/YourCloudIcons'
 import { ViewModeSwitch } from './ViewModeSwitch'
-import type { DeletedItem, FileSection } from '../domain/types'
-import { getTrashClearFeedbackText } from '../domain/rules'
-import { formatModified } from '../domain/selectors'
+import { formatModified, getTrashClearFeedbackText, type DeletedItem, type FileSection } from '../domain'
 
 type Props = {
   section: FileSection

@@ -1,11 +1,8 @@
 import { Box, Button, Card, CardContent, IconButton, Typography } from '@mui/material'
 import FilePreview from '../../../components/FilePreview'
 import { DownloadLineIcon, MoreIcon, ShareLineIcon } from '../../../shared/icons/YourCloudIcons'
-import { getBaseName } from '../domain/path'
-import { canDownloadFile, formatDisplayFileSize, isDirectoryItem } from '../domain/rules'
-import { formatModified } from '../domain/selectors'
+import { canDownloadFile, formatDisplayFileSize, formatModified, getBaseName, isDirectoryItem, type FileItem, type FileSection } from '../domain'
 import { FileTypeBadge } from './FileTypeBadge'
-import type { FileItem, FileSection } from '../domain/types'
 
 type Props = {
   section: FileSection

@@ -1,4 +1,4 @@
-import { extensionOf, isImageFile, isPdfFile, isTextFile, isVideoFile } from '../features/files/domain/fileKind'
+import { extensionOf, isImageFile, isPdfFile, isTextFile, isVideoFile } from '../features/files/domain'
 
 type PreviewKind = 'image' | 'video' | 'document' | 'text' | 'other'
 

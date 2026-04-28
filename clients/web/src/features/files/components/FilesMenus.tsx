@@ -1,6 +1,6 @@
 import { Menu, MenuItem } from '@mui/material'
 import { ArchiveIcon, AudioIcon, DeleteIcon, FileIcon, ImageIcon, MoveIcon, PdfIcon, StarIcon, VideoIcon } from '../../../shared/icons/YourCloudIcons'
-import type { FileItem, TimeFilter, TypeFilter } from '../domain/types'
+import type { FileItem, TimeFilter, TypeFilter } from '../domain'
 
 type ActionMenuProps = {
   anchorEl: null | HTMLElement

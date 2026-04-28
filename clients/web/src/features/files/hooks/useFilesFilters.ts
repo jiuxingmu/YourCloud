@@ -1,6 +1,5 @@
 import { useMemo, useState, type MouseEvent } from 'react'
-import { matchesTimeFilter, matchesTypeFilter } from '../domain/selectors'
-import type { FileItem, TimeFilter, TypeFilter } from '../domain/types'
+import { matchesTimeFilter, matchesTypeFilter, type FileItem, type TimeFilter, type TypeFilter } from '../domain'
 
 export function useFilesFilters(files: FileItem[], query: string) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')

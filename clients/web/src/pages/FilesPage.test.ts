@@ -1,19 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import {
-  deriveDriveItems,
-  canDownloadFile,
-  formatDisplayFileSize,
-  getDefaultViewModeForSection,
-  shouldUseTopRightViewSwitch,
-  getDeleteDialogDescription,
-  getDeleteDialogTitle,
-  getDeleteFeedbackText,
-  getTrashClearFeedbackText,
-  mergeVirtualAndRemoteFiles,
-  shouldShowCreateActions,
-} from './FilesPage'
+import FilesPageContainer from './FilesPageContainer'
+import { canDownloadFile, deriveDriveItems, formatDisplayFileSize, getDefaultViewModeForSection, getDeleteDialogDescription, getDeleteDialogTitle, getDeleteFeedbackText, getTrashClearFeedbackText, mergeVirtualAndRemoteFiles, shouldShowCreateActions, shouldUseTopRightViewSwitch } from '../features/files/domain'
 
 describe('FilesPage helpers', () => {
+  it('exposes FilesPageContainer for container/view split', () => {
+    expect(typeof FilesPageContainer).toBe('function')
+  })
+
   it('hides create actions in home and trash', () => {
     expect(shouldShowCreateActions('home')).toBe(false)
     expect(shouldShowCreateActions('trash')).toBe(false)

@@ -1,10 +1,6 @@
 import { useState, type MouseEvent } from 'react'
-import { authHeaders } from '../../../apiClient'
-import { buildFileDownloadUrl, createFolder, createShare, deleteFile, moveFile } from '../data/filesApi'
-import { emitFilesChanged } from '../data/filesEvents'
-import { getDeleteFeedbackText } from '../domain/rules'
-import { normalizePath } from '../domain/path'
-import type { DeletedItem, FileItem } from '../domain/types'
+import { createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, validateMoveTargetName } from '../application/fileActionsService'
+import { getDeleteFeedbackText, type DeletedItem, type FileItem } from '../domain'
 
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
 type ErrorMessageFn = (error: unknown) => string
@@ -40,18 +36,8 @@ export function useFileActions(options: Options) {
   const [deleteTargetFile, setDeleteTargetFile] = useState<FileItem | null>(null)
 
   async function createFileShare(file: FileItem) {
-    if (file.mimeType === 'inode/directory') {
-      showFeedback('error', '文件夹暂不支持创建分享链接')
-      return
-    }
-    try {
-      const data = await createShare(file.id, 24)
-      const link = data.url || `${location.origin}/?share=unknown`
-      setShareLink(link)
-      showFeedback('success', `已创建分享链接：${file.filename}`)
-    } catch (error) {
-      showFeedback('error', toErrorMessage(error))
-    }
+    const link = await createFileShareService(file, showFeedback, toErrorMessage)
+    if (link) setShareLink(link)
   }
 
   async function copyShareLink() {
@@ -65,29 +51,9 @@ export function useFileActions(options: Options) {
   }
 
   async function download(file: FileItem) {
-    if (!canDownloadFile(file)) {
-      showFeedback('error', '当前项目不支持下载')
-      return
-    }
     setDownloadingId(file.id)
-    try {
-      const res = await fetch(buildFileDownloadUrl(file.id), { headers: { ...authHeaders() } })
-      if (!res.ok) throw new Error('下载失败')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = file.filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-      showFeedback('success', '已开始下载。')
-    } catch (error) {
-      showFeedback('error', toErrorMessage(error))
-    } finally {
-      setDownloadingId(null)
-    }
+    await downloadFileService(file, showFeedback, toErrorMessage, { canDownloadFile, fetchImpl: fetch })
+    setDownloadingId(null)
   }
 
   function openActionMenu(event: MouseEvent<HTMLElement>, file: FileItem) {
@@ -116,18 +82,9 @@ export function useFileActions(options: Options) {
       setDeleteTargetFile(null)
       return
     }
-    try {
-      await deleteFile(file.id)
-      showFeedback('success', getDeleteFeedbackText(file))
-      persistDeleted([{ id: file.id, filename: file.filename, deletedAt: new Date().toISOString() }, ...deletedItems].slice(0, 50))
-      await load()
-      emitFilesChanged()
-    } catch (error) {
-      showFeedback('error', toErrorMessage(error))
-    } finally {
-      setDeleteDialogOpen(false)
-      setDeleteTargetFile(null)
-    }
+    await deleteFileService(file, deletedItems, persistDeleted, load, showFeedback, toErrorMessage)
+    setDeleteDialogOpen(false)
+    setDeleteTargetFile(null)
   }
 
   function requestMoveFile(file: FileItem) {
@@ -139,12 +96,12 @@ export function useFileActions(options: Options) {
   async function confirmMoveFile() {
     const file = moveTargetFile
     if (!file) return
-    if (!moveFilenameInput.trim()) {
+    const nextName = validateMoveTargetName(moveFilenameInput)
+    if (!nextName) {
       showFeedback('error', '请输入有效的目标名称')
       return
     }
     if (file.mimeType === 'inode/directory') {
-      const nextName = moveFilenameInput.trim()
       setVirtualFolders((prev) => prev.map((f) => (f.id === file.id ? { ...f, filename: nextName, updatedAt: new Date().toISOString() } : f)))
       setFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, filename: nextName, updatedAt: new Date().toISOString() } : f)))
       showFeedback('success', `已移动：${file.filename}`)
@@ -153,18 +110,10 @@ export function useFileActions(options: Options) {
       setMoveFilenameInput('')
       return
     }
-    try {
-      await moveFile(file.id, moveFilenameInput.trim())
-      showFeedback('success', `已移动：${file.filename}`)
-      await load()
-      emitFilesChanged()
-    } catch (error) {
-      showFeedback('error', toErrorMessage(error))
-    } finally {
-      setMoveDialogOpen(false)
-      setMoveTargetFile(null)
-      setMoveFilenameInput('')
-    }
+    await moveFileService(file, nextName, load, showFeedback, toErrorMessage)
+    setMoveDialogOpen(false)
+    setMoveTargetFile(null)
+    setMoveFilenameInput('')
   }
 
   async function confirmCreateFolder() {
@@ -172,31 +121,9 @@ export function useFileActions(options: Options) {
       showFeedback('error', '请输入有效的文件夹名称')
       return
     }
-    try {
-      await createFolder(folderPathInput.trim())
-      showFeedback('success', `已创建文件夹：${folderPathInput.trim()}`)
-      const now = new Date().toISOString()
-      const pseudoFolder: FileItem = {
-        id: -Math.floor(Date.now() + Math.random() * 1000),
-        filename: folderPathInput.trim(),
-        size: 0,
-        mimeType: 'inode/directory',
-        createdAt: now,
-        updatedAt: now,
-      }
-      setVirtualFolders((prev) => {
-        const next = [pseudoFolder, ...prev.filter((item) => normalizePath(item.filename) !== normalizePath(pseudoFolder.filename))]
-        virtualFoldersRef.current = next
-        return next
-      })
-      setFiles((prev) => [pseudoFolder, ...prev.filter((item) => item.id !== pseudoFolder.id)])
-      await load()
-    } catch (error) {
-      showFeedback('error', toErrorMessage(error))
-    } finally {
-      setFolderDialogOpen(false)
-      setFolderPathInput('')
-    }
+    await createFolderService(folderPathInput.trim(), setVirtualFolders, setFiles, virtualFoldersRef, load, showFeedback, toErrorMessage)
+    setFolderDialogOpen(false)
+    setFolderPathInput('')
   }
 
   function toggleStar(file: FileItem) {

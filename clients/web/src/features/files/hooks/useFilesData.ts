@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { listFiles, uploadFile } from '../data/filesApi'
 import { emitFilesChanged } from '../data/filesEvents'
-import { mergeVirtualAndRemoteFiles } from '../domain/selectors'
-import type { FileItem } from '../domain/types'
+import { mergeVirtualAndRemoteFiles, type FileItem } from '../domain'
 
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
 type ErrorMessageFn = (error: unknown) => string

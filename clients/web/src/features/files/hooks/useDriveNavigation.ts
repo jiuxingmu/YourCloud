@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getParentPath } from '../domain/path'
-import type { FileItem, FileSection } from '../domain/types'
+import { getParentPath, type FileItem, type FileSection } from '../domain'
 
 export function useDriveNavigation(section: FileSection) {
   const [currentDrivePath, setCurrentDrivePath] = useState('')

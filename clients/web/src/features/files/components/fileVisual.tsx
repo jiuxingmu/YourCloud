@@ -1,7 +1,6 @@
 import type { SvgIconProps } from '@mui/material'
 import { ArchiveIcon, AudioIcon, FileIcon, FolderIcon, ImageIcon, PdfIcon, VideoIcon } from '../../../shared/icons/YourCloudIcons'
-import { isArchiveFile, isAudioFile, isImageFile, isPdfFile, isVideoFile } from '../domain/fileKind'
-import type { FileItem } from '../domain/types'
+import { isArchiveFile, isAudioFile, isImageFile, isPdfFile, isVideoFile, type FileItem } from '../domain'
 
 export function resolveFileVisual(file: FileItem): { icon: (props: SvgIconProps) => JSX.Element; color: string; bg: string } {
   if (isImageFile(file.filename, file.mimeType)) return { icon: ImageIcon, color: '#1a73e8', bg: '#e8f0fe' }

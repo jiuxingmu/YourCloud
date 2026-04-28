@@ -1,6 +1,5 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from '@mui/material'
-import type { FileItem } from '../domain/types'
-import { getDeleteDialogDescription, getDeleteDialogTitle } from '../domain/rules'
+import { getDeleteDialogDescription, getDeleteDialogTitle, type FileItem } from '../domain'
 
 const dialogPaperSx = { borderRadius: 0, border: '1px solid #dfe3e8', minWidth: 560 }
 

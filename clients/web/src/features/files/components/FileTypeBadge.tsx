@@ -1,6 +1,6 @@
 import { Box } from '@mui/material'
 import { resolveFileVisual } from './fileVisual'
-import type { FileItem } from '../domain/types'
+import type { FileItem } from '../domain'
 
 export function FileTypeBadge({ file, size = 18 }: { file: FileItem; size?: number }) {
   const visual = resolveFileVisual(file)

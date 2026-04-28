@@ -1,4 +1,4 @@
-import type { DeletedItem } from '../domain/types'
+import type { DeletedItem } from '../domain'
 
 export const FILES_STORAGE_KEYS = {
   searchHistory: 'search_history_files',
