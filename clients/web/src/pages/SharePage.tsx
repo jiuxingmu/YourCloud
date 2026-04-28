@@ -19,6 +19,7 @@ export function isExtractCodeError(error: unknown): boolean {
 export function mapShareErrorMessage(error: unknown): string {
   if (isExtractCodeError(error)) return '请输入正确的提取码后访问'
   if (error instanceof ApiRequestError && error.status === 410 && error.code === 'EXPIRED') return '分享链接已过期'
+  if (error instanceof ApiRequestError && error.status === 410 && error.code === 'REVOKED') return '分享已被取消'
   if (error instanceof ApiRequestError && error.status === 404 && error.code === 'NOT_FOUND') return '分享内容不存在或已被删除'
   return SHARE_LINK_INVALID_TEXT
 }

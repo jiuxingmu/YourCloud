@@ -19,6 +19,7 @@ describe('SharePage helpers', () => {
 
   it('maps share errors to user-friendly messages by status code', () => {
     expect(mapShareErrorMessage(new ApiRequestError('expired', { status: 410, code: 'EXPIRED' }))).toBe('分享链接已过期')
+    expect(mapShareErrorMessage(new ApiRequestError('revoked', { status: 410, code: 'REVOKED' }))).toBe('分享已被取消')
     expect(mapShareErrorMessage(new ApiRequestError('missing', { status: 404, code: 'NOT_FOUND' }))).toBe('分享内容不存在或已被删除')
     expect(mapShareErrorMessage(new Error('unknown'))).toBe(SHARE_LINK_INVALID_TEXT)
   })

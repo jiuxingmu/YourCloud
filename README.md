@@ -1,99 +1,96 @@
 # YourCloud
 
-Cloud-drive style MVP built with:
+## 项目简介
 
-- **Backend:** Go + Gin + GORM + PostgreSQL
-- **Frontend:** React + Vite + TypeScript + MUI
+YourCloud 是一个写给所有人的开源云盘：不限速、跨平台、稳定可靠。  
+我们相信，文件不该被速度限制，不该被平台锁定，也不该被黑盒服务绑架。
 
----
+这个项目的目标很直接：
+- 做一个真正“好用”的云盘，开箱即用，长期可维护
+- 保持代码公开透明，让每个人都能参与改进
+- 支持自部署，把数据控制权还给用户和团队
 
-## Project Structure
+如果你也在寻找一个能长期使用、可持续演进的云盘项目，欢迎一起把它打磨成社区共建的基础设施。
 
-- `services/api-go`: API service
-- `clients/web`: web client
-- `infra/docker-compose.yml`: local PostgreSQL
-- `scripts/dev.sh`: one-command local startup (DB + API + Web)
+## 技术栈
 
----
+- **服务端**：Go、Gin、GORM、PostgreSQL
+- **前端**：React、Vite、TypeScript、MUI
+- **本地基础设施**：Docker（PostgreSQL）
+- **测试**：Vitest（前端）、Go test（后端）
 
-## Core Features
+## 本地编译与运行
 
-- Register / Login (JWT auth)
-- File list / upload / download
-- Folder creation and drive-style navigation
-- Share link creation and share page lookup by token
-- Trash, recent, starred views (web)
+### 1) 环境要求
 
----
-
-## Run Locally
-
-### Prerequisites
-
-- Docker (for PostgreSQL)
-- Go toolchain
+- Docker
+- Go
 - Node.js + npm
 
-### Start everything
+### 2) 一键启动（推荐）
 
 ```bash
 ./scripts/dev.sh
 ```
 
-After startup:
+启动后：
+- Web：`http://localhost:8082/`
+- API：`http://localhost:8080/`
 
-- Web: `http://localhost:8082/`
-- Backend: `http://localhost:8080/`
-
-Health check:
+健康检查：
 
 ```bash
 curl http://localhost:8080/health
 ```
 
----
+### 3) 单独编译（可选）
 
-## Frontend Test
-
-Run web tests from `clients/web`:
+前端：
 
 ```bash
+cd clients/web
+npm install
+npm run build
+```
+
+后端：
+
+```bash
+cd services/api-go
+go build ./...
+```
+
+### 4) 运行测试（可选）
+
+前端：
+
+```bash
+cd clients/web
 npm test
 ```
 
-Run specific test files:
+后端：
 
 ```bash
-npm test -- src/App.test.ts src/pages/FilesPage.test.ts
+cd services/api-go
+go test ./...
 ```
 
----
+## 功能进展
 
-## API (v1)
+### 已完成
 
-### Auth
+- 账号：注册、登录、登出（JWT）
+- 文件：列表、上传、下载、删除、移动
+- 文件夹：创建与层级导航
+- 分享：创建分享、按 token 访问、提取码校验、下载
+- 视图：最近、星标、回收站（Web）
+- 基础测试与回归文档体系
 
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
+### 待完成（下一阶段）
 
-### Files
-
-- `POST /api/v1/files`
-- `GET /api/v1/files`
-- `GET /api/v1/files/:id/download`
-- `POST /api/v1/files/folders`
-- `DELETE /api/v1/files/:id`
-- `PATCH /api/v1/files/:id/move`
-
-### Shares
-
-- `POST /api/v1/shares`
-- `GET /api/v1/shares/:token`
-- `GET /api/v1/shares/:token/download`
-
----
-
-## Notes
-
-- Local QA artifacts under `dogfood-output/` are ignored by git.
-- Share routes are handled at `/share/:token`; invalid tokens should render share error state in web UI.
+- 多端扩展（Android / iOS / Desktop）
+- 更完整的预览能力（如 Office 等格式）
+- 更强上传能力（大文件分片、断点续传）
+- 权限与协作能力（更细粒度权限、多人协作）
+- 私有化与多云存储配置体验优化
