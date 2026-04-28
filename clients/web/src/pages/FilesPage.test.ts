@@ -100,4 +100,35 @@ describe('FilesPage helpers', () => {
     expect(derived[0].mimeType).toBe('inode/directory')
     expect(derived[0].filename).toBe('alpha')
   })
+
+  it('normalizes drive path separators when deriving nested items', () => {
+    const files = [
+      { id: 1, filename: '\\alpha\\beta\\spec.md', size: 20, mimeType: 'text/markdown' },
+      { id: 2, filename: 'alpha/beta', size: 0, mimeType: 'inode/directory' },
+    ]
+    const derived = deriveDriveItems(files, '/alpha/')
+    expect(derived).toHaveLength(1)
+    expect(derived[0].filename).toBe('alpha/beta')
+    expect(derived[0].mimeType).toBe('inode/directory')
+  })
+
+  it('deduplicates drive entries by normalized path', () => {
+    const files = [
+      { id: 1, filename: 'docs/new-folder', size: 0, mimeType: 'inode/directory' },
+      { id: 2, filename: 'docs//new-folder/', size: 0, mimeType: 'inode/directory' },
+    ]
+    const derived = deriveDriveItems(files, 'docs')
+    expect(derived).toHaveLength(1)
+    expect(derived[0].filename).toBe('docs/new-folder')
+  })
+
+  it('keeps folders before files and sorts names in locale order', () => {
+    const files = [
+      { id: 1, filename: 'docs/zeta.txt', size: 1, mimeType: 'text/plain' },
+      { id: 2, filename: 'docs/alpha', size: 0, mimeType: 'inode/directory' },
+      { id: 3, filename: 'docs/beta.txt', size: 1, mimeType: 'text/plain' },
+    ]
+    const derived = deriveDriveItems(files, 'docs')
+    expect(derived.map((item) => `${item.mimeType}:${item.filename}`)).toEqual(['inode/directory:docs/alpha', 'text/plain:docs/beta.txt', 'text/plain:docs/zeta.txt'])
+  })
 })
