@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Box, Button, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
 import { ViewModeSwitch } from './ViewModeSwitch'
-import { formatModified, getTrashClearFeedbackText, type DeletedItem, type FileSection } from '../domain'
+import { formatModified, getBaseName, getParentPath, getTrashClearFeedbackText, type DeletedItem, type FileSection } from '../domain'
 
 type Props = {
   section: FileSection
@@ -38,12 +38,12 @@ export function FilesSectionContent(props: Props) {
     setViewMode,
   } = props
 
-  if (!loading && section === 'trash') {
-    const trashHeaderCellSx = { width: '50%' }
+  if (section === 'trash') {
+    const trashHeaderCellSx = { width: '25%' }
     return (
       <Box sx={{ p: 2 }}>
         <Stack direction="row" sx={{ mb: 1.5, justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography sx={{ fontWeight: 600 }}>回收站（本地删除记录）</Typography>
+          <Typography sx={{ fontWeight: 600 }}>回收站</Typography>
           <Button
             size="small"
             onClick={() => {
@@ -67,18 +67,22 @@ export function FilesSectionContent(props: Props) {
             <TableRow>
               <TableCell sx={trashHeaderCellSx}>名称</TableCell>
               <TableCell sx={trashHeaderCellSx}>删除时间</TableCell>
+              <TableCell sx={trashHeaderCellSx}>文件大小</TableCell>
+              <TableCell sx={trashHeaderCellSx}>原始位置</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {deletedItems.map((item) => (
               <TableRow key={`${item.id}-${item.deletedAt}`}>
-                <TableCell>{item.filename}</TableCell>
+                <TableCell>{getBaseName(item.filename)}</TableCell>
                 <TableCell>{formatModified(item.deletedAt)}</TableCell>
+                <TableCell>-</TableCell>
+                <TableCell>{getParentPath(item.filename) || '-'}</TableCell>
               </TableRow>
             ))}
             {deletedItems.length === 0 && (
               <TableRow>
-                <TableCell colSpan={2}>
+                <TableCell colSpan={4}>
                   <Typography color="text.secondary">暂无记录</Typography>
                 </TableCell>
               </TableRow>

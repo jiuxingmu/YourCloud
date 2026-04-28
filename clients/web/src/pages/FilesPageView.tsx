@@ -154,7 +154,7 @@ export default function FilesPageView(props: Props) {
     <Box sx={{ display: 'grid', gap: 2.5 }}>
       <Paper variant="outlined" sx={{ borderRadius: 0, p: 2, borderColor: '#dfe3e8', backgroundColor: '#fff' }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { xs: 'stretch', sm: 'center' }, mb: 2 }}>
-          {(section === 'drive' || section === 'trash') && (
+          {section === 'drive' && (
             <>
               {shouldShowCreateActions(section) && (
                 <>
