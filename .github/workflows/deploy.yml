@@ -69,10 +69,39 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           script: |
             set -e
-            cd ${{ secrets.DEPLOY_PATH }}
             export GHCR_USER='${{ secrets.GHCR_USER }}'
             export GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}'
-            export API_IMAGE='ghcr.io/${{ needs.build-and-push.outputs.repo_lower }}-api'
-            export WEB_IMAGE='ghcr.io/${{ needs.build-and-push.outputs.repo_lower }}-web'
-            export IMAGE_TAG='${{ needs.build-and-push.outputs.image_tag }}'
-            ./scripts/deploy.prod.sh
+            export API_IMAGE='ghcr.io/${{ needs.build-and-push.outputs.repo_lower }}-api:${{ needs.build-and-push.outputs.image_tag }}'
+            export WEB_IMAGE='ghcr.io/${{ needs.build-and-push.outputs.repo_lower }}-web:${{ needs.build-and-push.outputs.image_tag }}'
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            docker pull "$API_IMAGE"
+            docker pull "$WEB_IMAGE"
+
+            docker network create yourcloud-net >/dev/null 2>&1 || true
+
+            docker rm -f yourcloud-api >/dev/null 2>&1 || true
+            docker rm -f yourcloud-web >/dev/null 2>&1 || true
+
+            docker run -d \
+              --name yourcloud-api \
+              --restart unless-stopped \
+              --network yourcloud-net \
+              -p 18080:18080 \
+              -e PORT=18080 \
+              -e DB_URL='${{ secrets.DB_URL_PROD }}' \
+              -e JWT_SECRET='${{ secrets.JWT_SECRET_PROD }}' \
+              -e STORAGE_PROVIDER=local \
+              -e STORAGE_PATH=/app/uploads \
+              -e JWT_TTL_MIN=1440 \
+              -v yourcloud_uploads:/app/uploads \
+              "$API_IMAGE"
+
+            docker run -d \
+              --name yourcloud-web \
+              --restart unless-stopped \
+              --network yourcloud-net \
+              -p 8088:80 \
+              "$WEB_IMAGE"
+
+            docker ps --filter name=yourcloud-api --filter name=yourcloud-web

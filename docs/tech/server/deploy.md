@@ -33,7 +33,7 @@ chmod +x scripts/deploy.prod.sh
 ./scripts/deploy.prod.sh
 ```
 
-## 3. GitHub Hook 自动部署（流水线 + GHCR）
+## 3. GitHub Hook 自动部署（流水线 + GHCR，无需服务器 clone 代码）
 
 仓库已提供：`.github/workflows/deploy.yml`
 
@@ -43,19 +43,15 @@ chmod +x scripts/deploy.prod.sh
 - `DEPLOY_USER`：SSH 用户（如 `ubuntu`）
 - `DEPLOY_SSH_KEY`：私钥内容（建议专用 deploy key）
 - `DEPLOY_PORT`：SSH 端口（可选，默认 22）
-- `DEPLOY_PATH`：项目在服务器上的绝对路径（如 `/opt/yourcloud`）
 - `GHCR_USER`：用于 `docker login ghcr.io` 的用户名（通常是 GitHub 用户名）
 - `GHCR_TOKEN`：具有 `read:packages` 权限的令牌（用于服务器拉取 GHCR 镜像）
-
-完成后，每次 push 到 `main` 会自动 SSH 到服务器执行：
-
-```bash
-./scripts/deploy.prod.sh
-```
+- `DB_URL_PROD`：生产数据库连接串（例如 `postgres://user:pass@host:5432/db?sslmode=disable`）
+- `JWT_SECRET_PROD`：生产 JWT 密钥
 
 说明：
 - CI 会构建并推送两个镜像到 GHCR：`api` 与 `web`
-- 服务器不再本地构建，只负责 `docker pull` + `docker compose up -d`
+- 服务器不再本地构建，也不需要项目目录；只执行 `docker pull` + `docker run`
+- 端口已固定：`API=18080`、`Web=8088`，无需再配置端口相关 secrets
 - Web 已按 `/cloud/` 子路径构建，Nginx 暴露入口为 `/cloud/`
 - 推荐由 1Panel 统一做反向代理：`/cloud/` -> web，`/cloud/api/` -> api
 
@@ -74,10 +70,10 @@ docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yml resta
 
 ## 5. 访问入口
 
-- 网站：`http://<server-ip>:<WEB_PORT>/cloud/`
-- API 健康检查（直连）：`http://<server-ip>:<API_HOST_PORT>/health`
+- 网站：`http://<server-ip>:8088/cloud/`
+- API 健康检查（直连）：`http://<server-ip>:18080/health`
 
 ## 6. 1Panel 路由建议（方案 A）
 
-- 路由 1：`/cloud/` -> `http://127.0.0.1:<WEB_PORT>/cloud/`
-- 路由 2：`/cloud/api/` -> `http://127.0.0.1:<API_HOST_PORT>/api/`
+- 路由 1：`/cloud/` -> `http://127.0.0.1:8088/cloud/`
+- 路由 2：`/cloud/api/` -> `http://127.0.0.1:18080/api/`
