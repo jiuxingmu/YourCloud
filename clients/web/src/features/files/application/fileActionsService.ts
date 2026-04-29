@@ -46,6 +46,11 @@ export function buildShareLinkFromResponse(url: string | undefined, origin: stri
   return url || `${origin}/?share=unknown`
 }
 
+function buildShareLinkFromToken(origin: string, token: string): string {
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
+  return new URL(`${basePath}share/${token}`, origin).toString()
+}
+
 export async function createFileShareService(
   file: FileItem,
   options: { expireHours: number; extractCode: string },
@@ -60,7 +65,7 @@ export async function createFileShareService(
   try {
     const expireHours = Math.max(0, Math.floor(options.expireHours))
     const data = await deps.createShareApi(file.id, expireHours, options.extractCode.trim())
-    const link = data.token ? `${location.origin}/share/${data.token}` : buildShareLinkFromResponse(data.url, location.origin)
+    const link = data.token ? buildShareLinkFromToken(location.origin, data.token) : buildShareLinkFromResponse(data.url, location.origin)
     showFeedback('success', `已创建分享链接：${file.filename}`)
     return { url: link, token: data.token, expiresAt: data.expiresAt, extractCode: data.extractCode }
   } catch (error) {

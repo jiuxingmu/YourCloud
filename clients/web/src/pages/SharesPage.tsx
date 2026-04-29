@@ -60,7 +60,8 @@ export default function SharesPage() {
   }
 
   async function copyShareLink(token: string) {
-    const link = `${location.origin}/share/${token}`
+    const basePath = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
+    const link = new URL(`${basePath}share/${token}`, location.origin).toString()
     setFeedback('')
     try {
       if (navigator.clipboard?.writeText) {
@@ -96,7 +97,7 @@ export default function SharesPage() {
     <Box sx={{ display: 'grid', gap: 2 }}>
       <Typography sx={{ fontSize: 34, fontWeight: 500 }}>分享管理</Typography>
       <Paper variant="outlined" sx={{ borderRadius: 0, p: 2, borderColor: '#dfe3e8' }}>
-        <Stack direction="row" alignItems="center" sx={{ mb: 1.5 }}>
+        <Stack direction="row" sx={{ mb: 1.5, alignItems: 'center' }}>
           <Typography sx={{ fontWeight: 600 }}>我的分享</Typography>
         </Stack>
         {feedback && <Alert severity="success" sx={{ mb: 1.5 }}>{feedback}</Alert>}

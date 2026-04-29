@@ -25,6 +25,7 @@ export function mapShareErrorMessage(error: unknown): string {
 }
 
 export default function SharePage({ token }: Props) {
+  const appHomeHref = import.meta.env.BASE_URL || '/'
   const [data, setData] = useState<{ file: { filename: string; id: number; mimeType?: string } } | null>(null)
   const [error, setError] = useState('')
   const [extractCode, setExtractCode] = useState('')
@@ -106,7 +107,7 @@ export default function SharePage({ token }: Props) {
                   <Button variant="contained" startIcon={<DownloadLineIcon />} href={buildShareDownloadUrlWithCode(token, extractCode)} disabled={loading}>
                     立即下载
                   </Button>
-                  <Button variant="outlined" href="/">
+                  <Button variant="outlined" href={appHomeHref}>
                     返回登录
                   </Button>
                 </Stack>

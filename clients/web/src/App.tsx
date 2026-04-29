@@ -39,7 +39,7 @@ import SharesPage from './pages/SharesPage'
 export function getShareTokenFromLocation(pathname: string, search: string): string | null {
   const queryToken = new URLSearchParams(search).get('share')
   if (queryToken) return queryToken
-  const match = pathname.match(/^\/share\/([^/?#]+)/)
+  const match = pathname.match(/(?:^|\/)share\/([^/?#]+)/)
   if (!match) return null
   try {
     return decodeURIComponent(match[1])
@@ -49,7 +49,7 @@ export function getShareTokenFromLocation(pathname: string, search: string): str
 }
 
 export function isShareRoute(pathname: string): boolean {
-  return /^\/share(?:\/|$)/.test(pathname)
+  return /(?:^|\/)share(?:\/|$)/.test(pathname)
 }
 
 type CurrentUser = { id: number; email: string }

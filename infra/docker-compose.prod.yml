@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-yourcloud}
+      POSTGRES_USER: ${POSTGRES_USER:-yourcloud}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-yourcloud} -d ${POSTGRES_DB:-yourcloud}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${API_IMAGE}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      PORT: ${API_PORT:-18080}
+      DB_URL: postgres://${POSTGRES_USER:-yourcloud}:${POSTGRES_PASSWORD:-change_me}@postgres:5432/${POSTGRES_DB:-yourcloud}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      STORAGE_PROVIDER: local
+      STORAGE_PATH: /app/uploads
+      JWT_TTL_MIN: ${JWT_TTL_MIN:-1440}
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "${API_HOST_PORT:-18080}:${API_PORT:-18080}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    image: ${WEB_IMAGE}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-8088}:80"
+
+volumes:
+  pgdata:
+  uploads:
