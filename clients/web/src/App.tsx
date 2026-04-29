@@ -213,9 +213,27 @@ export default function App() {
             <AppBar position="fixed" color="inherit" elevation={0}>
               <Toolbar sx={{ minHeight: 64, px: 1.5 }}>
                 <Box sx={{ width: 180, display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#5f6368' }}>
-                    YourCloud
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#5f6368' }}>
+                      YourCloud
+                    </Typography>
+                    <Box
+                      sx={{
+                        px: 0.8,
+                        py: '1px',
+                        borderRadius: 0,
+                        border: '1px solid #f2c46f',
+                        bgcolor: '#fff7e6',
+                        color: '#9a6a00',
+                        fontSize: 10,
+                        lineHeight: 1.2,
+                        fontWeight: 600,
+                        letterSpacing: 0.4,
+                      }}
+                    >
+                      测试版
+                    </Box>
+                  </Box>
                 </Box>
                 <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
                   <ClickAwayListener onClickAway={() => setSearchOpen(false)}>

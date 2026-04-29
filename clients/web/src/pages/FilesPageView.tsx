@@ -57,6 +57,9 @@ type FileActionsViewModel = {
 type Props = {
   section: FileSection
   loading: boolean
+  uploading: boolean
+  uploadProgress: number
+  uploadingFilename: string
   viewMode: ViewMode
   setViewMode: (mode: ViewMode) => void
   handleUploadChange: (event: ChangeEvent<HTMLInputElement>) => void
@@ -88,6 +91,9 @@ export default function FilesPageView(props: Props) {
   const {
     section,
     loading,
+    uploading,
+    uploadProgress,
+    uploadingFilename,
     viewMode,
     setViewMode,
     handleUploadChange,
@@ -173,6 +179,23 @@ export default function FilesPageView(props: Props) {
             </>
           )}
         </Stack>
+        {uploading && (
+          <Box sx={{ mb: 1.5 }}>
+            <Typography variant="caption" color="text.secondary">
+              正在上传：{uploadingFilename || '文件'} ({uploadProgress}%)
+            </Typography>
+            <Box sx={{ mt: 0.6, height: 6, borderRadius: 3, bgcolor: '#e8ecf3', overflow: 'hidden' }}>
+              <Box
+                sx={{
+                  width: `${uploadProgress}%`,
+                  height: '100%',
+                  bgcolor: '#1a73e8',
+                  transition: 'width .2s ease',
+                }}
+              />
+            </Box>
+          </Box>
+        )}
 
         {loading && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

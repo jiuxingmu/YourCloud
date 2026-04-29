@@ -91,7 +91,25 @@ export default function LoginPage({ onSuccess }: Props) {
           <Stack spacing={2.5}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
               <Avatar sx={{ width: 32, height: 32, bgcolor: '#1a73e8', fontSize: 15 }}>云</Avatar>
-              <Typography sx={{ fontSize: 20, fontWeight: 500 }}>登录 YourCloud</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                <Typography sx={{ fontSize: 20, fontWeight: 500 }}>登录 YourCloud</Typography>
+                <Box
+                  sx={{
+                    px: 0.8,
+                    py: '1px',
+                    borderRadius: 0,
+                    border: '1px solid #f2c46f',
+                    bgcolor: '#fff7e6',
+                    color: '#9a6a00',
+                    fontSize: 10,
+                    lineHeight: 1.2,
+                    fontWeight: 600,
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  测试版
+                </Box>
+              </Box>
             </Box>
             <Typography color="text.secondary" sx={{ fontSize: 14 }}>
               使用你的账号访问云端硬盘

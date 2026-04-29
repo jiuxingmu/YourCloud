@@ -43,10 +43,59 @@ export async function listFiles(): Promise<FileItem[]> {
 }
 
 export async function uploadFile(file: File, folderPath = ''): Promise<FileItem> {
+  return await uploadFileWithProgress(file, folderPath)
+}
+
+export async function uploadFileWithProgress(file: File, folderPath = '', onProgress?: (percent: number) => void): Promise<FileItem> {
   const form = new FormData()
   form.append('file', file)
   form.append('path', folderPath)
-  return await request<FileItem>('/api/v1/files', { method: 'POST', headers: { ...authHeaders() }, body: form })
+
+  return await new Promise<FileItem>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_BASE_URL}/api/v1/files`)
+
+    const headers = authHeaders()
+    for (const [k, v] of Object.entries(headers)) {
+      xhr.setRequestHeader(k, v)
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (!onProgress || !event.lengthComputable) return
+      const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)))
+      onProgress(percent)
+    }
+
+    xhr.onerror = () => {
+      reject(new Error('网络连接异常，请检查网络后重试。'))
+    }
+
+    xhr.onload = () => {
+      const text = xhr.responseText || ''
+      let body: unknown = {}
+      try {
+        body = text ? JSON.parse(text) : {}
+      } catch {
+        body = {}
+      }
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const message = (body as { error?: { message?: string } })?.error?.message || `Request failed: ${xhr.status}`
+        reject(new Error(message))
+        return
+      }
+
+      const data = (body as { data?: FileItem }).data
+      if (!data) {
+        reject(new Error('上传响应数据异常'))
+        return
+      }
+      onProgress?.(100)
+      resolve(data)
+    }
+
+    xhr.send(form)
+  })
 }
 
 export async function deleteFile(id: number): Promise<void> {

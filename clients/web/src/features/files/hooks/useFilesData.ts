@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listFiles, uploadFile } from '../data/filesApi'
+import { listFiles, uploadFileWithProgress } from '../data/filesApi'
 import { emitFilesChanged } from '../data/filesEvents'
 import { mergeVirtualAndRemoteFiles, type FileItem } from '../domain'
 
@@ -10,6 +10,9 @@ export function useFilesData(showFeedback: FeedbackFn, toErrorMessage: ErrorMess
   const [files, setFiles] = useState<FileItem[]>([])
   const [virtualFolders, setVirtualFolders] = useState<FileItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadingFilename, setUploadingFilename] = useState('')
   const virtualFoldersRef = useRef<FileItem[]>([])
 
   async function load() {
@@ -25,13 +28,20 @@ export function useFilesData(showFeedback: FeedbackFn, toErrorMessage: ErrorMess
   }
 
   async function upload(file: File, folderPath = '') {
+    setUploading(true)
+    setUploadProgress(0)
+    setUploadingFilename(file.name)
     try {
-      await uploadFile(file, folderPath)
+      await uploadFileWithProgress(file, folderPath, setUploadProgress)
       showFeedback('success', '上传成功。')
       await load()
       emitFilesChanged()
     } catch (error) {
       showFeedback('error', toErrorMessage(error))
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+      setUploadingFilename('')
     }
   }
 
@@ -57,6 +67,9 @@ export function useFilesData(showFeedback: FeedbackFn, toErrorMessage: ErrorMess
     setVirtualFolders,
     virtualFoldersRef,
     loading,
+    uploading,
+    uploadProgress,
+    uploadingFilename,
     load,
     upload,
   }

@@ -91,7 +91,7 @@ export function RefreshLineIcon(props: SvgIconProps) {
 export function UploadIcon(props: SvgIconProps) {
   return (
     <SvgIcon {...props} viewBox="0 0 24 24">
-      <path d="M11 3h2v8.17l2.59-2.58L17 10l-5 5-5-5 1.41-1.41L11 11.17zM5 19h14v2H5z" />
+      <path d="M5 19h14v2H5zM12 4l5 5-1.41 1.41L13 7.83V17h-2V7.83L8.41 10.41 7 9z" />
     </SvgIcon>
   )
 }

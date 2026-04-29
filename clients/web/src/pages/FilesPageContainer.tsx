@@ -32,7 +32,7 @@ export default function FilesPageContainer({ searchQuery = '', section = 'drive'
     writeDeletedItems(next)
   }
 
-  const { files, setFiles, setVirtualFolders, virtualFoldersRef, loading, load, upload } = useFilesData(
+  const { files, setFiles, setVirtualFolders, virtualFoldersRef, loading, uploading, uploadProgress, uploadingFilename, load, upload } = useFilesData(
     showFeedback,
     (error) => toUserFriendlyErrorMessage(error, 'files'),
   )
@@ -117,6 +117,9 @@ export default function FilesPageContainer({ searchQuery = '', section = 'drive'
     <FilesPageView
       section={section}
       loading={loading}
+      uploading={uploading}
+      uploadProgress={uploadProgress}
+      uploadingFilename={uploadingFilename}
       viewMode={viewMode}
       setViewMode={setViewMode}
       handleUploadChange={handleUploadChange}
