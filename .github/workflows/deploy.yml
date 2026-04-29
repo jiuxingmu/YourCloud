@@ -73,15 +73,37 @@ jobs:
             export GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}'
             export API_IMAGE='ghcr.io/${{ needs.build-and-push.outputs.repo_lower }}-api:${{ needs.build-and-push.outputs.image_tag }}'
             export WEB_IMAGE='ghcr.io/${{ needs.build-and-push.outputs.repo_lower }}-web:${{ needs.build-and-push.outputs.image_tag }}'
+            export JWT_SECRET='${{ secrets.JWT_SECRET_PROD }}'
+            export POSTGRES_DB='${{ secrets.POSTGRES_DB_PROD || 'yourcloud' }}'
+            export POSTGRES_USER='${{ secrets.POSTGRES_USER_PROD || 'yourcloud' }}'
+            export POSTGRES_PASSWORD='yourcloud_dev_password_2026'
+
+            if [ -z "$JWT_SECRET" ]; then
+              echo "Missing JWT_SECRET_PROD secret."
+              exit 1
+            fi
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker pull "$API_IMAGE"
             docker pull "$WEB_IMAGE"
 
             docker network create yourcloud-net >/dev/null 2>&1 || true
+            docker volume create yourcloud_pgdata >/dev/null 2>&1 || true
+            docker volume create yourcloud_uploads >/dev/null 2>&1 || true
 
-            docker rm -f yourcloud-api >/dev/null 2>&1 || true
             docker rm -f yourcloud-web >/dev/null 2>&1 || true
+            docker rm -f yourcloud-api >/dev/null 2>&1 || true
+            docker rm -f yourcloud-postgres >/dev/null 2>&1 || true
+
+            docker run -d \
+              --name yourcloud-postgres \
+              --restart unless-stopped \
+              --network yourcloud-net \
+              -v yourcloud_pgdata:/var/lib/postgresql/data \
+              -e POSTGRES_DB="$POSTGRES_DB" \
+              -e POSTGRES_USER="$POSTGRES_USER" \
+              -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+              postgres:16
 
             docker run -d \
               --name yourcloud-api \
@@ -89,8 +111,8 @@ jobs:
               --network yourcloud-net \
               -p 18080:18080 \
               -e PORT=18080 \
-              -e DB_URL='${{ secrets.DB_URL_PROD }}' \
-              -e JWT_SECRET='${{ secrets.JWT_SECRET_PROD }}' \
+              -e DB_URL="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@yourcloud-postgres:5432/$POSTGRES_DB?sslmode=disable" \
+              -e JWT_SECRET="$JWT_SECRET" \
               -e STORAGE_PROVIDER=local \
               -e STORAGE_PATH=/app/uploads \
               -e JWT_TTL_MIN=1440 \
@@ -104,4 +126,4 @@ jobs:
               -p 8088:80 \
               "$WEB_IMAGE"
 
-            docker ps --filter name=yourcloud-api --filter name=yourcloud-web
+            docker ps --filter name=yourcloud-postgres --filter name=yourcloud-api --filter name=yourcloud-web
