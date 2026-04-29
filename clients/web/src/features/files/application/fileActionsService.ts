@@ -42,6 +42,22 @@ export function validateMoveTargetName(input: string): string | null {
   return trimmed ? trimmed : null
 }
 
+export function remapVirtualFoldersAfterMove(virtualFolders: FileItem[], fromPath: string, toPath: string, isDirectory: boolean): FileItem[] {
+  const from = normalizePath(fromPath)
+  const to = normalizePath(toPath)
+  if (!from || !to || from === to) return virtualFolders
+
+  return virtualFolders.map((item) => {
+    const current = normalizePath(item.filename)
+    if (!current) return item
+    if (!isDirectory && current === from) return { ...item, filename: to }
+    if (!isDirectory) return item
+    if (current === from) return { ...item, filename: to }
+    if (current.startsWith(`${from}/`)) return { ...item, filename: `${to}${current.slice(from.length)}` }
+    return item
+  })
+}
+
 export function buildShareLinkFromResponse(url: string | undefined, origin: string): string {
   return url || `${origin}/?share=unknown`
 }
@@ -130,14 +146,16 @@ export async function moveFileService(
   showFeedback: FeedbackFn,
   toErrorMessage: ErrorMessageFn,
   deps: MoveDeps = { moveFileApi: moveFile, emitFilesChangedEvent: emitFilesChanged },
-): Promise<void> {
+): Promise<boolean> {
   try {
     await deps.moveFileApi(file.id, nextFilename)
     showFeedback('success', `已移动：${file.filename}`)
     await load()
     deps.emitFilesChangedEvent()
+    return true
   } catch (error) {
     showFeedback('error', toErrorMessage(error))
+    return false
   }
 }
 

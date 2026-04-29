@@ -1,5 +1,5 @@
 import { useState, type MouseEvent } from 'react'
-import { createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, validateMoveTargetName, type ShareResult } from '../application/fileActionsService'
+import { createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, remapVirtualFoldersAfterMove, validateMoveTargetName, type ShareResult } from '../application/fileActionsService'
 import { copyTextToClipboard } from '../application/clipboard'
 import { getBaseName, getParentPath, normalizePath, type DeletedItem, type FileItem } from '../domain'
 
@@ -145,7 +145,11 @@ export function useFileActions(options: Options) {
     const basename = getBaseName(file.filename)
     const nextName = validateMoveTargetName(destinationFolder ? `${destinationFolder}/${basename}` : basename)
     if (!nextName) return
-    await moveFileService(file, nextName, load, showFeedback, toErrorMessage)
+    const moved = await moveFileService(file, nextName, load, showFeedback, toErrorMessage)
+    if (!moved) return
+    const isDirectory = file.mimeType === 'inode/directory'
+    setVirtualFolders((prev) => remapVirtualFoldersAfterMove(prev, file.filename, nextName, isDirectory))
+    setFiles((prev) => remapVirtualFoldersAfterMove(prev, file.filename, nextName, isDirectory))
     setMoveDialogOpen(false)
     setMoveTargetFile(null)
     setMoveTargetFolderPath('')
