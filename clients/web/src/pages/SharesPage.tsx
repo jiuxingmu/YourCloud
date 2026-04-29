@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Box, Button, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
+import { Alert, Box, Button, Paper, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
 import { ApiRequestError, toUserFriendlyErrorMessage } from '../apiClient'
 import { listMyShares, revokeShare, type ManagedShareItem } from '../features/files/data/filesApi'
 
@@ -95,11 +95,8 @@ export default function SharesPage() {
 
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
-      <Typography sx={{ fontSize: 34, fontWeight: 500 }}>分享管理</Typography>
-      <Paper variant="outlined" sx={{ borderRadius: 0, p: 2, borderColor: '#dfe3e8' }}>
-        <Stack direction="row" sx={{ mb: 1.5, alignItems: 'center' }}>
-          <Typography sx={{ fontWeight: 600 }}>我的分享</Typography>
-        </Stack>
+      <Paper variant="outlined" sx={{ borderRadius: 0, p: 2 ,borderColor: '#dfe3e8' }}>
+        <Typography sx={{ fontSize: 36, fontWeight: 500, mb: 2 , mt: 2}}>分享管理</Typography>
         {feedback && <Alert severity="success" sx={{ mb: 1.5 }}>{feedback}</Alert>}
         {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
         <Table size="small" sx={unifiedTableSx}>

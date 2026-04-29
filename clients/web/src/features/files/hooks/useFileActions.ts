@@ -1,5 +1,6 @@
 import { useState, type MouseEvent } from 'react'
 import { createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, validateMoveTargetName, type ShareResult } from '../application/fileActionsService'
+import { copyTextToClipboard } from '../application/clipboard'
 import { getBaseName, getParentPath, normalizePath, type DeletedItem, type FileItem } from '../domain'
 
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
@@ -86,12 +87,12 @@ export function useFileActions(options: Options) {
 
   async function copyShareLink() {
     if (!shareLink) return
-    try {
-      await navigator.clipboard.writeText(shareLink)
+    const copied = await copyTextToClipboard(shareLink)
+    if (copied) {
       showFeedback('success', '分享链接已复制。')
-    } catch {
-      showFeedback('error', '复制分享链接失败，请手动复制。')
+      return
     }
+    showFeedback('error', '复制分享链接失败，请手动复制。')
   }
 
   async function download(file: FileItem) {

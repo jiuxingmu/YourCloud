@@ -197,12 +197,6 @@ export default function FilesPageView(props: Props) {
           </Box>
         )}
 
-        {loading && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            正在加载文件...
-          </Typography>
-        )}
-
         <FilesSectionContent
           section={section}
           loading={loading}

@@ -41,9 +41,10 @@ export function FilesSectionContent(props: Props) {
   if (section === 'trash') {
     const trashHeaderCellSx = { width: '25%' }
     return (
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ display: 'grid', gap: 2 }}>
+        <Typography sx={{ fontSize: 36, fontWeight: 500 }}>回收站</Typography>
+        <Box sx={{ p: 2 }}>
         <Stack direction="row" sx={{ mb: 1.5, justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography sx={{ fontWeight: 600 }}>回收站</Typography>
           <Button
             size="small"
             onClick={() => {
@@ -89,6 +90,7 @@ export function FilesSectionContent(props: Props) {
             )}
           </TableBody>
         </Table>
+        </Box>
       </Box>
     )
   }
@@ -138,6 +140,16 @@ export function FilesSectionContent(props: Props) {
         ) : (
           renderListView
         )}
+      </Box>
+    )
+  }
+
+  if (section === 'starred') {
+    return (
+      <Box sx={{ display: 'grid', gap: 2 }}>
+        <Typography sx={{ fontSize: 36, fontWeight: 500 }}>已加星标</Typography>
+        {filterAndViewControls}
+        {viewMode === 'grid' ? renderGridView : renderListView}
       </Box>
     )
   }
