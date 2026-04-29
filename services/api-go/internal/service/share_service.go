@@ -17,6 +17,7 @@ type ShareService struct {
 
 var ErrInvalidExtractCode = errors.New("invalid extract code")
 var ErrShareAlreadyRevoked = errors.New("share already revoked")
+var ErrWeakExtractCode = errors.New("extract code must be 4-16 letters or digits")
 
 type ShareWithFile struct {
 	Share    *model.Share `json:"share"`
@@ -59,11 +60,31 @@ func (s ShareService) CreateWithOptions(userID, fileID uint, expireHours int, pa
 		t := time.Now().Add(time.Duration(expireHours) * time.Hour)
 		expiresAt = &t
 	}
-	share := &model.Share{Token: newShareToken(), FileID: fileID, CreatedBy: userID, ExpiresAt: expiresAt, Passcode: strings.TrimSpace(passcode)}
+	normalizedPasscode, err := NormalizeExtractCode(passcode)
+	if err != nil {
+		return nil, err
+	}
+	share := &model.Share{Token: newShareToken(), FileID: fileID, CreatedBy: userID, ExpiresAt: expiresAt, Passcode: normalizedPasscode}
 	if err := s.Shares.Create(share); err != nil {
 		return nil, err
 	}
 	return share, nil
+}
+
+func NormalizeExtractCode(input string) (string, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return "", nil
+	}
+	if len(trimmed) < 4 || len(trimmed) > 16 {
+		return "", ErrWeakExtractCode
+	}
+	for _, ch := range trimmed {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')) {
+			return "", ErrWeakExtractCode
+		}
+	}
+	return trimmed, nil
 }
 
 func (s ShareService) ValidateExtractCode(share *model.Share, providedCode string) error {

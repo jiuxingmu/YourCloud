@@ -113,7 +113,10 @@ export function FilesDialogs(props: Props) {
               },
             }}
           >
-            <MenuItem value="">我的云端硬盘（根目录）</MenuItem>
+            <MenuItem value="" disabled>
+              请选择目标文件夹
+            </MenuItem>
+            <MenuItem value="/">我的云端硬盘（根目录）</MenuItem>
             {moveFolderOptions.map((folder) => (
               <MenuItem key={folder} value={folder}>
                 {folder}

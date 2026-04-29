@@ -221,3 +221,27 @@ func TestFileServiceMoveByOwnerRejectsMovingFolderIntoOwnDescendant(t *testing.T
 		t.Fatalf("expected invalid data error when moving folder into own descendant, got %v", err)
 	}
 }
+
+func TestFileServiceMoveByOwnerRejectsSamePath(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.File{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	item := model.File{OwnerID: 1, Filename: "docs/readme.md", StoredPath: "/tmp/readme.md", MimeType: "text/markdown"}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatalf("seed file: %v", err)
+	}
+
+	svc := FileService{
+		Files:   repo.FileRepo{DB: db},
+		Storage: storage.LocalStorage{BasePath: t.TempDir()},
+	}
+
+	_, err = svc.MoveByOwner(1, item.ID, "docs/readme.md")
+	if !errors.Is(err, gorm.ErrInvalidData) {
+		t.Fatalf("expected invalid data for same-path move, got %v", err)
+	}
+}

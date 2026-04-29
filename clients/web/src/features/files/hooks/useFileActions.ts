@@ -1,7 +1,7 @@
 import { useState, type MouseEvent } from 'react'
-import { createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, remapVirtualFoldersAfterMove, validateMoveTargetName, type ShareResult } from '../application/fileActionsService'
+import { buildMoveFilename, createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, remapVirtualFoldersAfterMove, validateShareExtractCode, type ShareResult } from '../application/fileActionsService'
 import { copyTextToClipboard } from '../application/clipboard'
-import { getBaseName, getParentPath, normalizePath, type DeletedItem, type FileItem } from '../domain'
+import { getParentPath, normalizePath, type DeletedItem, type FileItem } from '../domain'
 
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
 type ErrorMessageFn = (error: unknown) => string
@@ -78,7 +78,11 @@ export function useFileActions(options: Options) {
 
   async function createFileShare() {
     if (!shareSourceFile) return
-    await generateShareFor(shareSourceFile, shareExpireDays, shareExtractCode)
+    if (shareExtractCode.trim() && !validateShareExtractCode(shareExtractCode)) {
+      showFeedback('error', '提取码需为 4-16 位字母或数字')
+      return
+    }
+    await generateShareFor(shareSourceFile, shareExpireDays, shareExtractCode.trim())
   }
 
   function changeShareExpireDays(nextExpireDays: number) {
@@ -123,7 +127,16 @@ export function useFileActions(options: Options) {
   async function confirmDeleteFile() {
     const file = deleteTargetFile
     if (!file) return
-    await deleteFileService(file, deletedItems, persistDeleted, load, showFeedback, toErrorMessage)
+    const deleted = await deleteFileService(file, deletedItems, persistDeleted, load, showFeedback, toErrorMessage)
+    if (deleted) {
+      const target = normalizePath(file.filename)
+      const matchesDeletedPath = (path: string) => {
+        const normalized = normalizePath(path)
+        return normalized === target || normalized.startsWith(`${target}/`)
+      }
+      setVirtualFolders((prev) => prev.filter((item) => !matchesDeletedPath(item.filename)))
+      setFiles((prev) => prev.filter((item) => !matchesDeletedPath(item.filename)))
+    }
     setDeleteDialogOpen(false)
     setDeleteTargetFile(null)
   }
@@ -134,17 +147,23 @@ export function useFileActions(options: Options) {
       return
     }
     setMoveTargetFile(file)
-    setMoveTargetFolderPath(getParentPath(file.filename))
+    setMoveTargetFolderPath('')
     setMoveDialogOpen(true)
   }
 
   async function confirmMoveFile() {
     const file = moveTargetFile
     if (!file) return
-    const destinationFolder = moveTargetFolderPath.trim()
-    const basename = getBaseName(file.filename)
-    const nextName = validateMoveTargetName(destinationFolder ? `${destinationFolder}/${basename}` : basename)
+    if (!moveTargetFolderPath.trim()) {
+      showFeedback('error', '请选择目标文件夹')
+      return
+    }
+    const nextName = buildMoveFilename(file.filename, moveTargetFolderPath)
     if (!nextName) return
+    if (normalizePath(nextName) === normalizePath(file.filename)) {
+      showFeedback('error', '请选择不同的目标目录')
+      return
+    }
     const moved = await moveFileService(file, nextName, load, showFeedback, toErrorMessage)
     if (!moved) return
     const isDirectory = file.mimeType === 'inode/directory'

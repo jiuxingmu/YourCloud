@@ -50,3 +50,20 @@ func TestShareValidateExtractCode(t *testing.T) {
 		t.Fatalf("expected invalid extract code error, got %v", err)
 	}
 }
+
+func TestNormalizeExtractCode(t *testing.T) {
+	valid, err := NormalizeExtractCode("  Ab12  ")
+	if err != nil {
+		t.Fatalf("expected valid extract code, got %v", err)
+	}
+	if valid != "Ab12" {
+		t.Fatalf("expected trimmed code Ab12, got %s", valid)
+	}
+
+	if _, err := NormalizeExtractCode("1"); !errors.Is(err, ErrWeakExtractCode) {
+		t.Fatalf("expected weak extract code error for short code, got %v", err)
+	}
+	if _, err := NormalizeExtractCode("12 34"); !errors.Is(err, ErrWeakExtractCode) {
+		t.Fatalf("expected weak extract code error for invalid chars, got %v", err)
+	}
+}

@@ -116,6 +116,9 @@ func (s FileService) MoveByOwner(ownerID, fileID uint, nextFilename string) (*mo
 	if err != nil {
 		return nil, err
 	}
+	if normalizePath(current.Filename) == normalizePath(name) {
+		return nil, gorm.ErrInvalidData
+	}
 	if current.MimeType == "inode/directory" {
 		files, err := s.Files.ListByOwner(ownerID)
 		if err != nil {

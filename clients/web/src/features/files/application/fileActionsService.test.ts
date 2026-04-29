@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildShareLinkFromResponse, remapVirtualFoldersAfterMove, validateMoveTargetName } from './fileActionsService'
+import { buildMoveFilename, buildShareLinkFromResponse, remapVirtualFoldersAfterMove, validateMoveTargetName, validateShareExtractCode } from './fileActionsService'
 import type { FileItem } from '../domain'
 
 describe('fileActionsService', () => {
@@ -9,6 +9,18 @@ describe('fileActionsService', () => {
 
   it('rejects empty move target names after trimming', () => {
     expect(validateMoveTargetName('   ')).toBeNull()
+  })
+
+  it('requires share extract code length and charset when provided', () => {
+    expect(validateShareExtractCode('1')).toBeNull()
+    expect(validateShareExtractCode('12 34')).toBeNull()
+    expect(validateShareExtractCode('abcd')).toBe('abcd')
+  })
+
+  it('builds move filename only when destination folder is selected', () => {
+    expect(buildMoveFilename('demo/readme.md', '')).toBeNull()
+    expect(buildMoveFilename('demo/readme.md', '/')).toBeNull()
+    expect(buildMoveFilename('demo/readme.md', 'archive')).toBe('archive/readme.md')
   })
 
   it('remaps virtual folders after moving a folder', () => {

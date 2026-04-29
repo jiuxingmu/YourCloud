@@ -1,8 +1,8 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import { authHeaders } from '../../../apiClient'
+import { ApiRequestError, authHeaders } from '../../../apiClient'
 import { buildFileDownloadUrl, createFolder, createShare, deleteFile, moveFile } from '../data/filesApi'
 import { emitFilesChanged } from '../data/filesEvents'
-import { getDeleteFeedbackText, normalizePath, type DeletedItem, type FileItem } from '../domain'
+import { getBaseName, getDeleteFeedbackText, normalizePath, type DeletedItem, type FileItem } from '../domain'
 
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
 type ErrorMessageFn = (error: unknown) => string
@@ -40,6 +40,21 @@ type CreateFolderDeps = {
 export function validateMoveTargetName(input: string): string | null {
   const trimmed = input.trim()
   return trimmed ? trimmed : null
+}
+
+export function validateShareExtractCode(input: string): string | null {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+  if (!/^[A-Za-z0-9]{4,16}$/.test(trimmed)) return null
+  return trimmed
+}
+
+export function buildMoveFilename(currentFilename: string, destinationFolder: string): string | null {
+  const destination = normalizePath(destinationFolder.trim() === '/' ? '' : destinationFolder)
+  if (!destination) return null
+  const baseName = getBaseName(currentFilename)
+  if (!baseName) return null
+  return `${destination}/${baseName}`
 }
 
 export function remapVirtualFoldersAfterMove(virtualFolders: FileItem[], fromPath: string, toPath: string, isDirectory: boolean): FileItem[] {
@@ -103,7 +118,13 @@ export async function downloadFileService(
 
   try {
     const res = await deps.fetchImpl(buildFileDownloadUrl(file.id), { headers: { ...authHeaders() } })
-    if (!res.ok) throw new Error('下载失败')
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } }
+      throw new ApiRequestError(body.error?.message || `下载失败(${res.status})`, {
+        status: res.status,
+        code: body.error?.code,
+      })
+    }
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
@@ -127,15 +148,17 @@ export async function deleteFileService(
   showFeedback: FeedbackFn,
   toErrorMessage: ErrorMessageFn,
   deps: DeleteDeps = { deleteFileApi: deleteFile, emitFilesChangedEvent: emitFilesChanged },
-): Promise<void> {
+): Promise<boolean> {
   try {
     await deps.deleteFileApi(file.id)
     showFeedback('success', getDeleteFeedbackText(file))
     persistDeleted([{ id: file.id, filename: file.filename, deletedAt: new Date().toISOString() }, ...deletedItems].slice(0, 50))
     await load()
     deps.emitFilesChangedEvent()
+    return true
   } catch (error) {
     showFeedback('error', toErrorMessage(error))
+    return false
   }
 }
 

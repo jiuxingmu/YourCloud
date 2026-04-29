@@ -55,6 +55,10 @@ func (h ShareHandler) Create(c *gin.Context) {
 		if err.Error() == "forbidden" {
 			status = http.StatusForbidden
 		}
+		if errors.Is(err, service.ErrWeakExtractCode) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "EXTRACT_CODE_INVALID", "message": err.Error()}})
+			return
+		}
 		c.JSON(status, gin.H{"error": gin.H{"code": "SHARE_FAILED", "message": err.Error()}})
 		return
 	}
