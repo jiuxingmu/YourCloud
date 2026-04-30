@@ -23,6 +23,7 @@ pnpm-debug.log*
 build/
 out/
 **/build/
+.gradle/
 .worktrees/
 dogfood-output/
 
