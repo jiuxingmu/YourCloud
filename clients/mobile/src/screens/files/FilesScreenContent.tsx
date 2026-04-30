@@ -45,12 +45,28 @@ export function FilesScreen() {
     }, []),
   );
 
+  function sortFileItems(items: FileItem[]): FileItem[] {
+    return [...items].sort((a, b) => {
+      const aIsDir = isDirectoryItem(a.filename, a.mimeType);
+      const bIsDir = isDirectoryItem(b.filename, b.mimeType);
+
+      if (aIsDir !== bIsDir) {
+        return aIsDir ? -1 : 1;
+      }
+
+      return a.filename.localeCompare(b.filename, 'en', {
+        sensitivity: 'base',
+        numeric: true,
+      });
+    });
+  }
+
   async function loadFiles(path = '/') {
     setLoading(true);
     try {
       const endpoint = path === '/' ? '/api/v1/files' : `/api/v1/files?path=${encodeURIComponent(path)}`;
       const data = await client.request<FileItem[]>(endpoint, { headers: { ...client.authHeaders() } });
-      setFiles(data);
+      setFiles(sortFileItems(data));
       setStatus('');
     } catch (error) {
       setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
