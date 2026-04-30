@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -16,7 +16,7 @@ import { AppTheme } from '../ui/theme';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-function TabIcon({ focused, name }: { focused: boolean; name: keyof typeof Ionicons.glyphMap }) {
+function TabIcon({ focused, name }: { focused: boolean; name: keyof typeof Feather.glyphMap }) {
   const scale = useRef(new Animated.Value(focused ? 1 : 0.95)).current;
   useEffect(() => {
     Animated.spring(scale, {
@@ -31,7 +31,7 @@ function TabIcon({ focused, name }: { focused: boolean; name: keyof typeof Ionic
     <Animated.View style={[styles.tabIconWrap, { transform: [{ scale }] }]}>
       {focused ? <View style={styles.tabTopIndicator} /> : null}
       <View style={[styles.tabBubble, focused && styles.tabBubbleActive]}>
-        <Ionicons name={name} size={20} color={focused ? AppTheme.colors.primary : '#94A3B8'} />
+        <Feather name={name} size={18} color={focused ? AppTheme.colors.primary : '#94A3B8'} />
       </View>
     </Animated.View>
   );
@@ -60,22 +60,22 @@ function MainTabs() {
       <Tab.Screen
         name="Cloud"
         component={FilesScreen}
-        options={{ title: '云盘', tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="cloud-outline" /> }}
+        options={{ title: '云盘', tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="cloud" /> }}
       />
       <Tab.Screen
         name="Local"
         component={LocalFilesScreen}
-        options={{ title: '本地', tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="phone-portrait-outline" /> }}
+        options={{ title: '本地', tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="hard-drive" /> }}
       />
       <Tab.Screen
         name="Shares"
         component={SharesScreen}
-        options={{ title: '分享', tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="share-social-outline" /> }}
+        options={{ title: '分享', tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="share-2" /> }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ title: '我的', tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="person-outline" /> }}
+        options={{ title: '我的', tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="user" /> }}
       />
     </Tab.Navigator>
   );

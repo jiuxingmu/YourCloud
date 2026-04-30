@@ -1,7 +1,9 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, SafeAreaView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, StyleSheet, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { createSdkClient } from '@yourcloud/sdk';
+import './global.css';
 import { AuthenticatedSessionProvider } from './src/context/AuthenticatedSessionContext';
 import { SdkClientProvider } from './src/context/SdkClientContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -107,42 +109,44 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {bootstrapping ? (
-        <View style={styles.bootContainer}>
-          <ActivityIndicator />
-        </View>
-      ) : (
-        <SdkClientProvider client={client}>
-          {token ? (
-            <AuthenticatedSessionProvider
-              value={{
-                onLogout: handleLogout,
-                initialApiBaseUrl: apiBaseUrl,
-                onApiBaseUrlChange: handleApiBaseUrlChange,
-              }}
-            >
-              <AppNavigator />
-            </AuthenticatedSessionProvider>
-          ) : (
-            <Animated.View
-              style={{
-                flex: 1,
-                opacity: authOpacity,
-                transform: [{ translateX: authTranslateX }],
-              }}
-            >
-              {authPage === 'login' ? (
-                <LoginScreen onLoggedIn={handleLoggedIn} onGoRegister={() => switchAuthPage('register')} />
-              ) : (
-                <RegisterScreen onLoggedIn={handleLoggedIn} onGoLogin={() => switchAuthPage('login')} />
-              )}
-            </Animated.View>
-          )}
-        </SdkClientProvider>
-      )}
-      <StatusBar style="auto" />
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safeArea}>
+        {bootstrapping ? (
+          <View style={styles.bootContainer}>
+            <ActivityIndicator />
+          </View>
+        ) : (
+          <SdkClientProvider client={client}>
+            {token ? (
+              <AuthenticatedSessionProvider
+                value={{
+                  onLogout: handleLogout,
+                  initialApiBaseUrl: apiBaseUrl,
+                  onApiBaseUrlChange: handleApiBaseUrlChange,
+                }}
+              >
+                <AppNavigator />
+              </AuthenticatedSessionProvider>
+            ) : (
+              <Animated.View
+                style={{
+                  flex: 1,
+                  opacity: authOpacity,
+                  transform: [{ translateX: authTranslateX }],
+                }}
+              >
+                {authPage === 'login' ? (
+                  <LoginScreen onLoggedIn={handleLoggedIn} onGoRegister={() => switchAuthPage('register')} />
+                ) : (
+                  <RegisterScreen onLoggedIn={handleLoggedIn} onGoLogin={() => switchAuthPage('login')} />
+                )}
+              </Animated.View>
+            )}
+          </SdkClientProvider>
+        )}
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

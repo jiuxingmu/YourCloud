@@ -1,20 +1,21 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActionSheetIOS, Alert, Animated, FlatList, Image, Linking, Modal, Platform, Pressable, RefreshControl, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { MotiView } from 'moti';
+import { MotiPressable } from 'moti/interactions';
+import { ActionSheetIOS, Alert, FlatList, Image, Linking, Modal, Platform, RefreshControl, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import type { FileItem } from '@yourcloud/sdk';
 import { useSdkClient } from '../context/SdkClientContext';
 import type { RootStackParamList } from '../navigation/types';
 import { AppTheme } from '../ui/theme';
+import { ScalePressable } from '../ui/ScalePressable';
 import { isDirectoryItem } from '../utils/previewKind';
 
 export function FilesScreen() {
   const client = useSdkClient();
   const navigation = useNavigation();
-  const listOpacity = useRef(new Animated.Value(1)).current;
-
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,17 +43,8 @@ export function FilesScreen() {
     }, []),
   );
 
-  function animateList(to: number, duration: number) {
-    Animated.timing(listOpacity, {
-      toValue: to,
-      duration,
-      useNativeDriver: true,
-    }).start();
-  }
-
   async function loadFiles(path = '/') {
     setLoading(true);
-    animateList(0.65, 120);
     try {
       const endpoint = path === '/' ? '/api/v1/files' : `/api/v1/files?path=${encodeURIComponent(path)}`;
       const data = await client.request<FileItem[]>(endpoint, { headers: { ...client.authHeaders() } });
@@ -62,7 +54,6 @@ export function FilesScreen() {
       setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
     } finally {
       setLoading(false);
-      animateList(1, 180);
     }
   }
 
@@ -213,9 +204,8 @@ export function FilesScreen() {
 
   function placeholderColor(filename: string): string {
     const lower = filename.toLowerCase();
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp')) return '#FCE7D6';
-    if (lower.endsWith('.pdf')) return '#FADCE1';
-    return '#EAF0F6';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp')) return '#DBEAFE';
+    return '#EEF2FF';
   }
 
   function openQuickActions() {
@@ -235,51 +225,52 @@ export function FilesScreen() {
     setQuickSheetVisible(true);
   }
 
-  function renderFileItem({ item }: { item: FileItem }) {
+  function renderFileItem({ item, index }: { item: FileItem; index: number }) {
     const isFolder = isDirectoryItem(item.filename, item.mimeType);
     const thumbnailUri = item.mimeType?.startsWith('image/') ? client.files.buildThumbnailUrl(item.id) : null;
 
     return (
-      <Pressable
-        style={({ pressed }) => [styles.fileCard, pressed && styles.fileCardPressed]}
-        onPress={() => openFileOrFolder(item)}
-        android_ripple={{ color: '#EDF1F7' }}
+      <MotiView
+        from={{ opacity: 0, translateY: 10 }}
+        animate={{ opacity: 1, translateY: 0 }}
+        transition={{ delay: index * 50, type: 'timing', duration: 240 }}
       >
-        <View style={styles.fileVisual}>
-          {thumbnailUri ? (
-            <Image source={{ uri: thumbnailUri, headers: { ...client.authHeaders() } }} style={styles.thumb} resizeMode="cover" />
-          ) : (
-            <View style={[styles.filePlaceholder, { backgroundColor: isFolder ? '#E1ECFF' : placeholderColor(item.filename) }]}>
-              <Ionicons name={isFolder ? 'folder' : 'document-outline'} size={22} color={isFolder ? '#2B6CFF' : '#5B6677'} />
-            </View>
-          )}
-        </View>
-        <View style={styles.fileInfo}>
-          <Text style={styles.fileName} numberOfLines={1}>
-            {item.filename}
-          </Text>
-          <Text style={styles.fileMeta}>
-            {formatSize(item.size)} · {formatDate(item.updatedAt || item.createdAt)}
-          </Text>
-        </View>
-        <Pressable
-          style={styles.moreButton}
-          onPress={() => {
-            setSelectedFile(item);
-            setMenuVisible(true);
-          }}
-          android_ripple={{ color: '#EDF1F7', radius: 16 }}
-        >
-          <Feather name="more-vertical" size={18} color="#7A8799" />
-        </Pressable>
-      </Pressable>
+        <ScalePressable style={styles.fileCard} onPress={() => openFileOrFolder(item)}>
+          <View style={styles.fileVisual}>
+            {thumbnailUri ? (
+              <Image source={{ uri: thumbnailUri, headers: { ...client.authHeaders() } }} style={styles.thumb} resizeMode="cover" />
+            ) : (
+              <View style={[styles.filePlaceholder, { backgroundColor: isFolder ? '#E8F0FF' : placeholderColor(item.filename) }]}>
+                <Feather name={isFolder ? 'folder' : 'file'} size={16} color={isFolder ? '#2563EB' : '#5B6677'} />
+              </View>
+            )}
+          </View>
+          <View style={styles.fileInfo}>
+            <Text style={styles.fileName} numberOfLines={1}>
+              {item.filename}
+            </Text>
+            <Text style={styles.fileMeta}>
+              {formatSize(item.size)} · {formatDate(item.updatedAt || item.createdAt)}
+            </Text>
+          </View>
+          <ScalePressable
+            style={styles.moreButton}
+            onPress={() => {
+              setSelectedFile(item);
+              setMenuVisible(true);
+            }}
+          >
+            <Feather name="more-vertical" size={18} color="#7A8799" />
+          </ScalePressable>
+        </ScalePressable>
+      </MotiView>
     );
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.pathBar}>
-        <Pressable
+        <ScalePressable
           onPress={() => {
             if (pathStack.length <= 1) return;
             const nextStack = pathStack.slice(0, -1);
@@ -289,8 +280,8 @@ export function FilesScreen() {
           style={[styles.pathBack, pathStack.length <= 1 && styles.pathBackDisabled]}
           disabled={pathStack.length <= 1}
         >
-          <Ionicons name="chevron-back" size={18} color={pathStack.length <= 1 ? '#A7B0BE' : '#4B5563'} />
-        </Pressable>
+          <Feather name="chevron-left" size={14} color={pathStack.length <= 1 ? '#A7B0BE' : '#4B5563'} />
+        </ScalePressable>
         <Text style={styles.pathText} numberOfLines={1}>
           {pathLabel}
         </Text>
@@ -298,72 +289,75 @@ export function FilesScreen() {
 
       {!!status && <Text style={styles.status}>{status}</Text>}
 
-      <Animated.View style={{ flex: 1, opacity: listOpacity }}>
-        <FlatList
-          data={files}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderFileItem}
-          contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AppTheme.colors.primary} />}
-          ListEmptyComponent={
-            loading ? null : (
-              <View style={styles.emptyWrap}>
-                <Ionicons name="cloud-offline-outline" size={26} color="#98A3B3" />
-                <Text style={styles.emptyText}>暂无文件</Text>
-              </View>
-            )
-          }
-        />
-      </Animated.View>
+      <FlatList
+        data={files}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderFileItem}
+        contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AppTheme.colors.primary} />}
+        ListEmptyComponent={
+          loading ? null : (
+            <View style={styles.emptyWrap}>
+              <Feather name="cloud-off" size={24} color="#98A3B3" />
+              <Text style={styles.emptyText}>暂无文件</Text>
+            </View>
+          )
+        }
+      />
 
-      <Pressable style={styles.fab} onPress={openQuickActions} android_ripple={{ color: '#83ACFF', radius: 30 }}>
-        <Ionicons name="add" size={24} color="#fff" />
-      </Pressable>
+      <MotiPressable
+        style={styles.fab}
+        animate={({ pressed }) => ({ scale: pressed ? 0.95 : 1 })}
+        transition={{ type: 'timing', duration: 120 }}
+        onPress={openQuickActions}
+      >
+        <Feather name="plus" size={22} color="#fff" />
+      </MotiPressable>
 
       <Modal transparent visible={quickSheetVisible && Platform.OS !== 'ios'} animationType="fade" onRequestClose={() => setQuickSheetVisible(false)}>
-        <Pressable style={styles.modalMask} onPress={() => setQuickSheetVisible(false)} />
+        <ScalePressable style={styles.modalMask} onPress={() => setQuickSheetVisible(false)} />
         <View style={styles.nativeSheet}>
-          <Pressable
+          <ScalePressable
             style={styles.sheetAction}
             onPress={() => {
               setQuickSheetVisible(false);
               void pickAndUploadFile();
             }}
           >
-            <Ionicons name="cloud-upload-outline" size={20} color="#1E2C45" />
+            <Feather name="upload-cloud" size={18} color="#1E2C45" />
             <Text style={styles.sheetActionText}>上传文件</Text>
-          </Pressable>
-          <Pressable
+          </ScalePressable>
+          <ScalePressable
             style={styles.sheetAction}
             onPress={() => {
               setQuickSheetVisible(false);
               setCreateFolderVisible(true);
             }}
           >
-            <Ionicons name="folder-open-outline" size={20} color="#1E2C45" />
+            <Feather name="folder-plus" size={18} color="#1E2C45" />
             <Text style={styles.sheetActionText}>新建文件夹</Text>
-          </Pressable>
+          </ScalePressable>
         </View>
       </Modal>
 
       <Modal transparent visible={createFolderVisible} animationType="slide" onRequestClose={() => setCreateFolderVisible(false)}>
-        <Pressable style={styles.modalMask} onPress={() => setCreateFolderVisible(false)} />
+        <ScalePressable style={styles.modalMask} onPress={() => setCreateFolderVisible(false)} />
         <View style={styles.bottomSheet}>
           <Text style={styles.bottomSheetTitle}>新建文件夹</Text>
           <TextInput value={folderName} onChangeText={setFolderName} style={styles.input} placeholder="输入文件夹名称" autoCapitalize="none" />
           <View style={styles.bottomSheetButtons}>
-            <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setCreateFolderVisible(false)}>
+            <ScalePressable style={[styles.btn, styles.btnGhost]} onPress={() => setCreateFolderVisible(false)}>
               <Text style={styles.btnGhostText}>取消</Text>
-            </Pressable>
-            <Pressable style={[styles.btn, styles.btnPrimary, creatingFolder && styles.btnDisabled]} onPress={createFolder} disabled={creatingFolder}>
+            </ScalePressable>
+            <ScalePressable style={[styles.btn, styles.btnPrimary, creatingFolder && styles.btnDisabled]} onPress={createFolder} disabled={creatingFolder}>
               <Text style={styles.btnPrimaryText}>{creatingFolder ? '创建中...' : '创建'}</Text>
-            </Pressable>
+            </ScalePressable>
           </View>
         </View>
       </Modal>
 
       <Modal transparent visible={menuVisible} animationType="fade" onRequestClose={() => setMenuVisible(false)}>
-        <Pressable
+        <ScalePressable
           style={styles.modalMask}
           onPress={() => {
             setMenuVisible(false);
@@ -371,7 +365,7 @@ export function FilesScreen() {
           }}
         />
         <View style={styles.actionPalette}>
-          <Pressable
+          <ScalePressable
             style={styles.paletteAction}
             onPress={() => {
               if (selectedFile) void downloadFile(selectedFile.id);
@@ -379,34 +373,34 @@ export function FilesScreen() {
             }}
             disabled={selectedFile ? downloadingFileId === selectedFile.id : false}
           >
-            <Ionicons name="download-outline" size={20} color="#2A67F7" />
+            <Feather name="download" size={18} color="#2A67F7" />
             <Text style={styles.paletteText}>{selectedFile && downloadingFileId === selectedFile.id ? '下载中...' : '下载'}</Text>
-          </Pressable>
-          <Pressable
+          </ScalePressable>
+          <ScalePressable
             style={styles.paletteAction}
             onPress={() => {
               if (selectedFile) openShareDialog(selectedFile);
               setMenuVisible(false);
             }}
           >
-            <Ionicons name="share-social-outline" size={20} color="#2A67F7" />
+            <Feather name="share-2" size={18} color="#2A67F7" />
             <Text style={styles.paletteText}>分享</Text>
-          </Pressable>
-          <Pressable
+          </ScalePressable>
+          <ScalePressable
             style={styles.paletteAction}
             onPress={() => {
               if (selectedFile) askDelete(selectedFile);
               setMenuVisible(false);
             }}
           >
-            <Ionicons name="trash-outline" size={20} color="#E11D48" />
+            <Feather name="trash-2" size={18} color="#E11D48" />
             <Text style={[styles.paletteText, { color: '#E11D48' }]}>删除</Text>
-          </Pressable>
+          </ScalePressable>
         </View>
       </Modal>
 
       <Modal transparent visible={shareDialogVisible} animationType="slide" onRequestClose={() => setShareDialogVisible(false)}>
-        <Pressable style={styles.modalMask} onPress={() => setShareDialogVisible(false)} />
+        <ScalePressable style={styles.modalMask} onPress={() => setShareDialogVisible(false)} />
         <View style={styles.bottomSheet}>
           <Text style={styles.bottomSheetTitle}>创建分享</Text>
           {shareTarget ? (
@@ -419,12 +413,12 @@ export function FilesScreen() {
           <Text style={styles.shareLabel}>提取码（可选）</Text>
           <TextInput value={shareExtractCode} onChangeText={setShareExtractCode} style={styles.input} placeholder="例如 abcd" autoCapitalize="none" />
           <View style={styles.bottomSheetButtons}>
-            <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setShareDialogVisible(false)} disabled={creatingShare}>
+            <ScalePressable style={[styles.btn, styles.btnGhost]} onPress={() => setShareDialogVisible(false)} disabled={creatingShare}>
               <Text style={styles.btnGhostText}>取消</Text>
-            </Pressable>
-            <Pressable style={[styles.btn, styles.btnPrimary, creatingShare && styles.btnDisabled]} onPress={shareFileWithOptions} disabled={creatingShare}>
+            </ScalePressable>
+            <ScalePressable style={[styles.btn, styles.btnPrimary, creatingShare && styles.btnDisabled]} onPress={shareFileWithOptions} disabled={creatingShare}>
               <Text style={styles.btnPrimaryText}>{creatingShare ? '创建中...' : '创建分享'}</Text>
-            </Pressable>
+            </ScalePressable>
           </View>
         </View>
       </Modal>
@@ -445,11 +439,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    shadowColor: '#CBD5E1',
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   pathBack: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: '#EAEFF6',
     alignItems: 'center',
     justifyContent: 'center',
@@ -460,7 +463,7 @@ const styles = StyleSheet.create({
   pathText: {
     flex: 1,
     color: '#66748A',
-    fontSize: 13,
+    fontSize: 12,
   },
   status: {
     color: '#66748A',
@@ -470,29 +473,24 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   fileCard: {
-    marginBottom: 10,
+    marginBottom: 8,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E9EDF2',
+    borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  fileCardPressed: {
-    transform: [{ scale: 0.98 }],
+    shadowColor: '#CBD5E1',
+    shadowOpacity: 0.32,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   fileVisual: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   thumb: {
@@ -509,14 +507,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fileName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#1E293B',
   },
   fileMeta: {
-    marginTop: 2,
-    color: '#999999',
-    fontSize: 13,
+    marginTop: 1,
+    color: '#64748B',
+    fontSize: 12,
   },
   moreButton: {
     width: 28,
@@ -538,17 +536,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     bottom: 28,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: AppTheme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#2563EB',
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 7,
     overflow: 'hidden',
   },
   modalMask: {

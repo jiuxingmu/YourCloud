@@ -1,9 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useAuthenticatedSession } from '../context/AuthenticatedSessionContext';
 import { useSdkClient } from '../context/SdkClientContext';
+import { ScalePressable } from '../ui/ScalePressable';
 
 type Me = { id: number; email: string };
 
@@ -13,6 +14,7 @@ export function ProfileScreen() {
   const [me, setMe] = useState<Me | null>(null);
   const [apiBaseUrl, setApiBaseUrl] = useState(initialApiBaseUrl);
   const [status, setStatus] = useState('');
+  const [inputFocused, setInputFocused] = useState(false);
 
   const loadMe = useCallback(async () => {
     try {
@@ -36,170 +38,74 @@ export function ProfileScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Ionicons name="person-outline" size={36} color="#fff" />
-        </View>
-        <Text style={styles.name}>YourCloud 用户</Text>
-        <Text style={styles.email}>{me?.email ?? '-'}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>云盘功能</Text>
-        <View style={styles.grid}>
-          {[
-            ['star-outline', '收藏'],
-            ['share-social-outline', '分享'],
-            ['trash-outline', '回收站'],
-            ['download-outline', '已下载'],
-          ].map(([icon, label]) => (
-            <Pressable key={label} style={styles.gridItem}>
-              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={22} color="#3D73F5" />
-              <Text style={styles.gridText}>{label}</Text>
-            </Pressable>
-          ))}
+    <ScrollView className="flex-1 bg-slate-50" contentContainerStyle={{ paddingBottom: 100 }}>
+      <View className="overflow-hidden px-4 pb-5 pt-6">
+        <View className="absolute inset-0 bg-blue-100" />
+        <View className="absolute -left-8 -top-5 h-32 w-32 rounded-full bg-blue-200/40" />
+        <View className="absolute -right-10 top-2 h-40 w-40 rounded-full bg-indigo-200/30" />
+        <View className="items-center">
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-blue-600">
+            <Feather name="user" size={24} color="#fff" />
+          </View>
+          <Text className="mt-3 text-2xl font-bold text-slate-900">YourCloud 用户</Text>
+          <Text className="mt-1 text-sm text-slate-600">{me?.email ?? '-'}</Text>
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>连接配置</Text>
-        <TextInput value={apiBaseUrl} onChangeText={setApiBaseUrl} style={styles.input} autoCapitalize="none" />
-        <Pressable style={styles.primaryBtn} onPress={saveApiBaseUrl}>
-          <Text style={styles.primaryBtnText}>保存 API 地址</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.rowItem}>
-          <Ionicons name="moon-outline" size={20} color="#64748B" />
-          <Text style={styles.rowText}>夜间模式（即将支持）</Text>
-        </View>
-        <View style={styles.rowItem}>
-          <Ionicons name="settings-outline" size={20} color="#64748B" />
-          <Text style={styles.rowText}>设置</Text>
-        </View>
-        <View style={styles.rowItem}>
-          <Ionicons name="chatbox-ellipses-outline" size={20} color="#64748B" />
-          <Text style={styles.rowText}>反馈</Text>
+      <View className="mx-4 mt-3 rounded-2xl bg-white p-4 shadow-lg shadow-slate-200">
+        <Text className="mb-3 text-lg font-semibold text-slate-800">云盘功能</Text>
+        <View className="rounded-2xl bg-slate-100 px-2 py-3">
+          <View className="flex-row">
+            {[
+              ['star', '收藏'],
+              ['share-2', '分享'],
+              ['trash-2', '回收站'],
+              ['download', '已下载'],
+            ].map(([icon, label]) => (
+              <ScalePressable key={label} className="w-1/4 items-center gap-2 py-1.5">
+                <Feather name={icon as keyof typeof Feather.glyphMap} size={16} color="#2563EB" />
+                <Text className="text-sm text-slate-700">{label}</Text>
+              </ScalePressable>
+            ))}
+          </View>
         </View>
       </View>
 
-      {!!status && <Text style={styles.status}>{status}</Text>}
+      <View className="mx-4 mt-3 rounded-2xl bg-white p-4 shadow-lg shadow-slate-200">
+        <Text className="mb-3 text-lg font-semibold text-slate-800">连接配置</Text>
+        <TextInput
+          value={apiBaseUrl}
+          onChangeText={setApiBaseUrl}
+          onFocus={() => setInputFocused(true)}
+          onBlur={() => setInputFocused(false)}
+          className={`mb-3 rounded-2xl px-4 py-3 text-sm text-slate-800 ${inputFocused ? 'border border-blue-500 bg-white' : 'bg-slate-100'}`}
+          autoCapitalize="none"
+        />
+        <ScalePressable className="items-center rounded-2xl bg-blue-600 py-3" onPress={saveApiBaseUrl}>
+          <Text className="text-sm font-semibold text-white">保存 API 地址</Text>
+        </ScalePressable>
+      </View>
 
-      <Pressable style={styles.logout} onPress={onLogout}>
-        <Text style={styles.logoutText}>退出登录</Text>
-      </Pressable>
+      <View className="mx-4 mt-3 rounded-2xl bg-white p-4 shadow-lg shadow-slate-200">
+        <View className="flex-row items-center gap-3 py-2">
+          <Feather name="moon" size={16} color="#64748B" />
+          <Text className="text-base text-slate-700">夜间模式（即将支持）</Text>
+        </View>
+        <View className="flex-row items-center gap-3 py-2">
+          <Feather name="settings" size={16} color="#64748B" />
+          <Text className="text-base text-slate-700">设置</Text>
+        </View>
+        <View className="flex-row items-center gap-3 py-2">
+          <Feather name="message-circle" size={16} color="#64748B" />
+          <Text className="text-base text-slate-700">反馈</Text>
+        </View>
+      </View>
+
+      {!!status && <Text className="mx-4 mt-3 text-sm text-emerald-600">{status}</Text>}
+
+      <ScalePressable className="mx-4 mt-3 items-center rounded-2xl bg-rose-50 py-3" onPress={onLogout}>
+        <Text className="text-sm font-semibold text-rose-600">退出登录</Text>
+      </ScalePressable>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    paddingTop: 24,
-    paddingBottom: 20,
-    alignItems: 'center',
-    backgroundColor: '#DDEAFF',
-  },
-  avatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#4C7BF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  name: {
-    marginTop: 10,
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  email: {
-    marginTop: 4,
-    color: '#526074',
-  },
-  card: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E9EDF2',
-    padding: 14,
-  },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 10,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 14,
-  },
-  gridItem: {
-    width: '25%',
-    alignItems: 'center',
-    gap: 6,
-  },
-  gridText: {
-    fontSize: 13,
-    color: '#334155',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    backgroundColor: '#fff',
-    marginBottom: 10,
-  },
-  primaryBtn: {
-    backgroundColor: '#2463EB',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  rowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-  },
-  rowText: {
-    fontSize: 15,
-    color: '#334155',
-  },
-  status: {
-    marginHorizontal: 16,
-    marginTop: 10,
-    color: '#16A34A',
-  },
-  logout: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 20,
-    backgroundColor: '#FFF1F2',
-    borderColor: '#FECACA',
-    borderWidth: 1,
-    borderRadius: 12,
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  logoutText: {
-    color: '#E11D48',
-    fontWeight: '700',
-  },
-});

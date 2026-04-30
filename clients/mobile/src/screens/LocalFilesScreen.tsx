@@ -1,7 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import { MotiView } from 'moti';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { ScalePressable } from '../ui/ScalePressable';
 
 type LocalItem = {
   id: string;
@@ -47,121 +49,55 @@ export function LocalFilesScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topRow}>
-        <Text style={styles.title}>本地</Text>
-        <Pressable style={styles.pickBtn} onPress={chooseLocalFiles} disabled={loading}>
-          <Ionicons name="folder-open-outline" size={18} color="#fff" />
-          <Text style={styles.pickBtnText}>{loading ? '读取中' : '选择文件'}</Text>
-        </Pressable>
+    <View className="flex-1 bg-slate-50 px-4 pt-3">
+      <View className="mb-2 flex-row items-center justify-between">
+        <Text className="text-3xl font-bold text-slate-950">本地</Text>
+        <ScalePressable
+          className="flex-row items-center gap-1 rounded-2xl bg-blue-600 px-3 py-2 shadow-lg shadow-slate-300"
+          onPress={chooseLocalFiles}
+          disabled={loading}
+        >
+          <Feather name="folder-plus" size={15} color="#fff" />
+          <Text className="text-sm font-semibold text-white">{loading ? '读取中' : '选择文件'}</Text>
+        </ScalePressable>
       </View>
 
-      <Text style={styles.count}>{countLabel}</Text>
+      <Text className="mb-3 text-sm text-slate-500">{countLabel}</Text>
 
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 100 }}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.iconWrap}>
-              <Ionicons name="document-outline" size={20} color="#4B5563" />
+        renderItem={({ item, index }) => (
+          <MotiView
+            from={{ opacity: 0, translateY: 10 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ delay: index * 50, type: 'timing', duration: 240 }}
+          >
+            <View className="mb-2 flex-row items-center gap-3 rounded-2xl bg-white px-3 py-2.5 shadow-lg shadow-slate-200">
+              <View className="h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+                <Feather name="file" size={16} color="#2563EB" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-semibold text-slate-800" numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text className="text-sm text-slate-500">
+                  {formatSize(item.size)} · {item.mimeType || 'unknown'}
+                </Text>
+              </View>
             </View>
-            <View style={styles.info}>
-              <Text style={styles.name} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={styles.meta}>
-                {formatSize(item.size)} · {item.mimeType || 'unknown'}
-              </Text>
-            </View>
-          </View>
+          </MotiView>
         )}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="phone-portrait-outline" size={24} color="#9AA5B5" />
-            <Text style={styles.emptyText}>选择本地文件后会显示在这里</Text>
+          <View className="mt-28 items-center">
+            <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
+              <Feather name="package" size={18} color="#64748B" />
+            </View>
+            <Text className="text-sm text-slate-400">选择本地文件后会显示在这里</Text>
           </View>
         }
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 38,
-    fontWeight: '800',
-    color: '#0B1324',
-  },
-  pickBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#2463EB',
-    borderRadius: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  pickBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  count: {
-    marginTop: 8,
-    marginBottom: 8,
-    color: '#8A95A6',
-  },
-  card: {
-    marginBottom: 10,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E9EDF2',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#EEF2F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  info: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  meta: {
-    marginTop: 2,
-    color: '#999999',
-    fontSize: 12,
-  },
-  empty: {
-    marginTop: 50,
-    alignItems: 'center',
-  },
-  emptyText: {
-    marginTop: 8,
-    color: '#9AA5B5',
-  },
-});
