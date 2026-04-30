@@ -5,7 +5,7 @@ import { ActionSheetIOS, Alert, FlatList, Linking, Platform, RefreshControl, Sha
 import { MotiPressable } from 'moti/interactions';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { getBaseName, isDirectoryItem, type FileItem } from '@yourcloud/sdk';
+import { getBaseName, getParentPath, isDirectoryItem, normalizePath, type FileItem } from '@yourcloud/sdk';
 import { useSdkClient } from '../../context/SdkClientContext';
 import type { RootStackParamList } from '../../navigation/types';
 import { AppTheme } from '../../ui/theme';
@@ -65,13 +65,97 @@ export function FilesScreen() {
     });
   }
 
+  function deriveCurrentPathItems(allFiles: FileItem[], path: string): FileItem[] {
+    const normalizedCurrent = normalizePath(path);
+    const folderByPath = new Map<string, FileItem>();
+    const directFiles: FileItem[] = [];
+    const syntheticFolderPaths = new Set<string>();
+
+    for (const file of allFiles) {
+      const full = normalizePath(file.filename);
+      if (!full) continue;
+      if (file.mimeType === 'inode/directory') folderByPath.set(full, file);
+    }
+
+    for (const file of allFiles) {
+      const full = normalizePath(file.filename);
+      if (!full) continue;
+      const parent = getParentPath(full);
+      const isFolder = file.mimeType === 'inode/directory';
+
+      if (normalizedCurrent === '') {
+        if (!full.includes('/')) directFiles.push(file);
+        else syntheticFolderPaths.add(full.split('/')[0]);
+        continue;
+      }
+
+      const prefix = `${normalizedCurrent}/`;
+      if (!full.startsWith(prefix)) continue;
+      const rest = full.slice(prefix.length);
+      if (!rest) continue;
+
+      if (rest.includes('/')) {
+        syntheticFolderPaths.add(`${normalizedCurrent}/${rest.split('/')[0]}`);
+        continue;
+      }
+
+      if (parent === normalizedCurrent || (isFolder && full === `${normalizedCurrent}/${rest}`)) {
+        directFiles.push(file);
+      }
+    }
+
+    const syntheticFolders: FileItem[] = Array.from(syntheticFolderPaths)
+      .filter((folderPath) => getParentPath(folderPath) === normalizedCurrent)
+      .map((folderPath) => {
+        const real = folderByPath.get(folderPath);
+        if (real) return real;
+        const now = new Date().toISOString();
+        return {
+          id: -Math.abs(
+            Array.from(folderPath).reduce((sum, ch) => {
+              return (sum * 31 + ch.charCodeAt(0)) | 0;
+            }, 0),
+          ),
+          filename: folderPath,
+          size: 0,
+          mimeType: 'inode/directory',
+          createdAt: now,
+          updatedAt: now,
+        };
+      });
+
+    const uniqueFoldersByPath = new Map<string, FileItem>();
+    const getTimestamp = (item: FileItem): number => {
+      const raw = item.updatedAt ?? item.createdAt;
+      if (!raw) return 0;
+      const time = Date.parse(raw);
+      return Number.isNaN(time) ? 0 : time;
+    };
+
+    for (const item of [...syntheticFolders, ...directFiles.filter((f) => f.mimeType === 'inode/directory')]) {
+      const key = normalizePath(item.filename);
+      const existing = uniqueFoldersByPath.get(key);
+      if (!existing) {
+        uniqueFoldersByPath.set(key, item);
+        continue;
+      }
+      const existingTime = getTimestamp(existing);
+      const incomingTime = getTimestamp(item);
+      if (incomingTime > existingTime || (incomingTime === existingTime && item.id > existing.id)) {
+        uniqueFoldersByPath.set(key, item);
+      }
+    }
+
+    return [...Array.from(uniqueFoldersByPath.values()), ...directFiles.filter((f) => f.mimeType !== 'inode/directory')];
+  }
+
   async function loadFiles(path = '/') {
     const requestId = ++latestLoadRequestRef.current;
     setLoading(true);
     try {
       const data = await client.filesList(path === '/' ? '' : path);
       if (requestId !== latestLoadRequestRef.current) return;
-      setFiles(sortFileItems(data));
+      setFiles(sortFileItems(deriveCurrentPathItems(data, path)));
       setStatus('');
     } catch (error) {
       if (requestId !== latestLoadRequestRef.current) return;
