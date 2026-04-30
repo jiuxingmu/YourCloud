@@ -1,15 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Typography } from '@mui/material'
-import { authHeaders } from '../apiClient'
-import { buildFileDownloadUrl, buildFileThumbnailUrl, buildShareDownloadUrlWithCode, buildShareThumbnailUrlWithCode } from '../features/files/data/filesApi'
-import { classifyPreviewKind, extensionOf } from './filePreviewKind'
-
+import { classifyPreviewKind, extensionOfFilename, shouldFetchPreviewSource } from '@yourcloud/sdk'
+import { sdkClient } from '../apiClient'
 type PreviewSource = { id: number; filename: string; mimeType?: string; shareToken?: string; shareExtractCode?: string; lazy?: boolean }
-
-export function shouldFetchPreviewSource(id: number, mimeType?: string): boolean {
-  if (mimeType === 'inode/directory') return false
-  return id > 0
-}
 
 async function createVideoPoster(url: string): Promise<string> {
   return await new Promise((resolve, reject) => {
@@ -54,7 +47,7 @@ export default function FilePreview({ id, filename, mimeType, shareToken, shareE
   const [textPreview, setTextPreview] = useState('')
   const [loading, setLoading] = useState(!lazy)
   const kind = useMemo(() => classifyPreviewKind(filename, mimeType), [filename, mimeType])
-  const ext = useMemo(() => extensionOf(filename).toUpperCase() || 'FILE', [filename])
+  const ext = useMemo(() => extensionOfFilename(filename).toUpperCase() || 'FILE', [filename])
 
   useEffect(() => {
     if (!lazy || visible) return
@@ -92,13 +85,14 @@ export default function FilePreview({ id, filename, mimeType, shareToken, shareE
       setPreviewUrl('')
       setTextPreview('')
       try {
-        const downloadUrl = shareToken ? buildShareDownloadUrlWithCode(shareToken, shareExtractCode) : buildFileDownloadUrl(id)
-        const thumbnailUrl = shareToken ? buildShareThumbnailUrlWithCode(shareToken, shareExtractCode) : buildFileThumbnailUrl(id)
-        const headers = shareToken ? {} : authHeaders()
-        const targetUrl = kind === 'image' ? thumbnailUrl : downloadUrl
-        const res = await fetch(targetUrl, { headers })
-        if (!res.ok) throw new Error(`preview failed: ${res.status}`)
-        const blob = await res.blob()
+        const blob =
+          kind === 'image'
+            ? shareToken
+              ? await sdkClient.shareFetchThumbnailBlob(shareToken, shareExtractCode)
+              : await sdkClient.fileFetchThumbnailBlob(id)
+            : shareToken
+              ? await sdkClient.shareFetchDownloadBlob(shareToken, shareExtractCode)
+              : await sdkClient.fileFetchDownloadBlob(id)
         objectUrl = URL.createObjectURL(blob)
 
         if (kind === 'image') {

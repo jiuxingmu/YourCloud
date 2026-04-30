@@ -1,7 +1,8 @@
 import { useState, type MouseEvent } from 'react'
+import { getParentPath, normalizePath } from '@yourcloud/sdk'
 import { buildMoveFilename, createFileShareService, createFolderService, deleteFileService, downloadFileService, moveFileService, remapVirtualFoldersAfterMove, validateShareExtractCode, type ShareResult } from '../application/fileActionsService'
 import { copyTextToClipboard } from '../application/clipboard'
-import { getParentPath, normalizePath, type DeletedItem, type FileItem } from '../domain'
+import { type DeletedItem, type FileItem } from '../domain'
 
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
 type ErrorMessageFn = (error: unknown) => string

@@ -5,11 +5,10 @@ import { ActionSheetIOS, Alert, FlatList, Linking, Platform, RefreshControl, Sha
 import { MotiPressable } from 'moti/interactions';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import type { FileItem } from '@yourcloud/sdk';
+import { isDirectoryItem, type FileItem } from '@yourcloud/sdk';
 import { useSdkClient } from '../../context/SdkClientContext';
 import type { RootStackParamList } from '../../navigation/types';
 import { AppTheme } from '../../ui/theme';
-import { isDirectoryItem } from '../../utils/previewKind';
 import { FileListItem } from './FileListItem';
 import { CreateFolderModal, FileActionPalette, QuickActionsModal, ShareDialogModal } from './FilesModals';
 import { FilesPathBar } from './FilesPathBar';
@@ -64,8 +63,7 @@ export function FilesScreen() {
   async function loadFiles(path = '/') {
     setLoading(true);
     try {
-      const endpoint = path === '/' ? '/api/v1/files' : `/api/v1/files?path=${encodeURIComponent(path)}`;
-      const data = await client.request<FileItem[]>(endpoint, { headers: { ...client.authHeaders() } });
+      const data = await client.filesList(path === '/' ? '' : path);
       setFiles(sortFileItems(data));
       setStatus('');
     } catch (error) {
@@ -86,7 +84,7 @@ export function FilesScreen() {
       const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
       if (result.canceled || result.assets.length === 0) return;
       const picked = result.assets[0];
-      await client.files.upload(
+      await client.fileUpload(
         {
           uri: picked.uri,
           name: picked.name || 'upload.bin',
@@ -106,7 +104,7 @@ export function FilesScreen() {
     setCreatingFolder(true);
     try {
       const fullPath = currentPath === '/' ? name : `${currentPath}/${name}`;
-      await client.files.createFolder(fullPath);
+      await client.folderCreate(fullPath);
       setFolderName('');
       setCreateFolderVisible(false);
       await loadFiles(currentPath);
@@ -135,7 +133,7 @@ export function FilesScreen() {
 
   async function deleteFile(fileId: number) {
     try {
-      await client.files.delete(fileId);
+      await client.fileDelete(fileId);
       await loadFiles(currentPath);
     } catch (error) {
       setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
@@ -162,7 +160,7 @@ export function FilesScreen() {
     const normalizedExtractCode = shareExtractCode.trim();
     setCreatingShare(true);
     try {
-      const share = await client.shares.create(shareTarget.id, normalizedExpireHours, normalizedExtractCode);
+      const share = await client.shareCreate(shareTarget.id, normalizedExpireHours, normalizedExtractCode);
       const shareUrl = buildShareUrl(share.token, share.url);
       setStatus(`分享已创建: ${share.token}`);
       setShareDialogVisible(false);
@@ -184,7 +182,7 @@ export function FilesScreen() {
     try {
       const cacheDir = FileSystem.cacheDirectory ?? '';
       const target = `${cacheDir}yourcloud_download_${fileId}_${Date.now()}`;
-      const result = await FileSystem.downloadAsync(client.files.buildDownloadUrl(fileId), target, { headers: { ...client.authHeaders() } });
+      const result = await client.fileDownloadToFile(fileId, target);
       setStatus('下载完成，已保存到应用缓存目录');
       await Linking.openURL(result.uri);
     } catch (error) {
@@ -243,7 +241,7 @@ export function FilesScreen() {
             item={item}
             index={index}
             authHeaders={client.authHeaders()}
-            buildThumbnailUrl={client.files.buildThumbnailUrl}
+            buildThumbnailUrl={client.fileBuildThumbnailUrl}
             onOpen={openFileOrFolder}
             onMore={(value) => {
               setSelectedFile(value);

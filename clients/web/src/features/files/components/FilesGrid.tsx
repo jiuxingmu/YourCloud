@@ -1,7 +1,8 @@
 import { Box, Button, Card, CardContent, IconButton, Typography } from '@mui/material'
+import { getBaseName } from '@yourcloud/sdk'
 import FilePreview from '../../../components/FilePreview'
 import { DownloadLineIcon, MoreIcon, ShareLineIcon } from '../../../shared/icons/YourCloudIcons'
-import { canDownloadFile, formatDisplayFileSize, formatModified, getBaseName, isDirectoryItem, type FileItem, type FileSection } from '../domain'
+import { canDownloadFile, formatDisplayFileSize, formatModified, isDirectoryItem, type FileItem, type FileSection } from '../domain'
 import { FileTypeBadge } from './FileTypeBadge'
 
 type Props = {

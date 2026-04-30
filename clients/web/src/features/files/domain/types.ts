@@ -1,13 +1,6 @@
-export type FileItem = {
-  id: number
-  filename: string
-  size: number
-  mimeType?: string
-  updatedAt?: string
-  createdAt?: string
-}
+import type { DeletedItem, FileItem } from '@yourcloud/sdk'
 
-export type DeletedItem = { id: number; filename: string; deletedAt: string }
+export type { DeletedItem, FileItem }
 
 export type FileSection = 'drive' | 'recent' | 'starred' | 'trash'
 

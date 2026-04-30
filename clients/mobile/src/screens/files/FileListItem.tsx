@@ -1,9 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { MotiView } from 'moti';
 import { Image, Text, View } from 'react-native';
-import type { FileItem } from '@yourcloud/sdk';
+import { isDirectoryItem, type FileItem } from '@yourcloud/sdk';
 import { ScalePressable } from '../../ui/ScalePressable';
-import { isDirectoryItem } from '../../utils/previewKind';
 import { filesStyles as styles } from './filesStyles';
 import { formatFileDate, formatFileSize, getFilePlaceholderColor } from './fileFormatters';
 

@@ -46,8 +46,8 @@ export function RegisterScreen({ onLoggedIn, onGoLogin }: Props) {
     setStatus({ type: 'info', message: '注册中...' });
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      await client.auth.register(normalizedEmail, password);
-      const loginData = await client.auth.login(normalizedEmail, password);
+      await client.authRegister(normalizedEmail, password);
+      const loginData = await client.authLogin(normalizedEmail, password);
       if (!loginData.token) {
         setStatus({ type: 'success', message: '注册成功，请返回登录' });
         return;

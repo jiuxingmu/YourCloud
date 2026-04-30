@@ -1,13 +1,7 @@
+import { formatBytes } from '@yourcloud/sdk';
+
 export function formatFileSize(size: number): string {
-  if (size < 1024) return `${size} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = size / 1024;
-  let idx = 0;
-  while (value >= 1024 && idx < units.length - 1) {
-    value /= 1024;
-    idx += 1;
-  }
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[idx]}`;
+  return formatBytes(size);
 }
 
 export function formatFileDate(iso?: string): string {

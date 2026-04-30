@@ -19,7 +19,7 @@ export function SharesScreen() {
   const loadShares = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await client.shares.listMine();
+      const data = await client.shareListMine();
       setItems(data);
       setStatus('');
     } catch (error) {
@@ -48,7 +48,7 @@ export function SharesScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await client.shares.revoke(item.share.id);
+            await client.shareRevoke(item.share.id);
             await loadShares();
           } catch (error) {
             setStatus(client.toUserFriendlyErrorMessage(error, 'files'));

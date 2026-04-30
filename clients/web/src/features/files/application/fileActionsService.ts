@@ -1,8 +1,9 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
+import { getBaseName, normalizePath } from '@yourcloud/sdk'
 import { ApiRequestError, authHeaders } from '../../../apiClient'
 import { buildFileDownloadUrl, createFolder, createShare, deleteFile, moveFile } from '../data/filesApi'
 import { emitFilesChanged } from '../data/filesEvents'
-import { getBaseName, getDeleteFeedbackText, normalizePath, type DeletedItem, type FileItem } from '../domain'
+import { getDeleteFeedbackText, type DeletedItem, type FileItem } from '../domain'
 
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
 type ErrorMessageFn = (error: unknown) => string

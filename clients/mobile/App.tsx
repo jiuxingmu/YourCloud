@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { createSdkClient } from '@yourcloud/sdk';
+import * as FileSystem from 'expo-file-system/legacy';
 import './global.css';
 import { AuthenticatedSessionProvider } from './src/context/AuthenticatedSessionContext';
 import { SdkClientProvider } from './src/context/SdkClientContext';
@@ -26,6 +27,9 @@ export default function App() {
       apiBaseUrl: apiBaseUrl.trim() || 'http://10.0.2.2:8080',
       tokenStore: {
         getToken: () => token || null,
+      },
+      fileDownloader: async (url, destination, options) => {
+        return await FileSystem.downloadAsync(url, destination, { headers: options?.headers ?? {} });
       },
     });
   }, [apiBaseUrl, token]);

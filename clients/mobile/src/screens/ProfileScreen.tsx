@@ -18,7 +18,7 @@ export function ProfileScreen() {
 
   const loadMe = useCallback(async () => {
     try {
-      const data = await client.auth.me<Me>();
+      const data = await client.authMe<Me>();
       setMe(data);
       setStatus('');
     } catch (error) {

@@ -47,7 +47,7 @@ export function LoginScreen({ onLoggedIn, onGoRegister }: Props) {
     setStatus({ type: 'info', message: '登录中...' });
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const data = await client.auth.login(normalizedEmail, password);
+      const data = await client.authLogin(normalizedEmail, password);
       if (!data.token) {
         setStatus({ type: 'error', message: '登录失败：未返回 token' });
         return;

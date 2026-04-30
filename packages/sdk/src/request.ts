@@ -1,47 +1,16 @@
+import type {
+  AuthTokenResponse,
+  FileItem,
+  ManagedShareItem,
+  RequestContext,
+  SdkClient,
+  SdkClientOptions,
+  ShareCreateResponse,
+  ShareGetByTokenResponse,
+  UploadFilePayload,
+} from './models'
+
 type ApiErr = { error?: { code?: string; message?: string } }
-
-export type RequestContext = 'auth' | 'files' | 'generic'
-
-export type TokenStore = {
-  getToken: () => string | null
-}
-
-export type SdkClientOptions = {
-  apiBaseUrl: string
-  tokenStore?: TokenStore
-}
-
-export type FileItem = {
-  id: number
-  filename: string
-  size: number
-  mimeType?: string
-  updatedAt?: string
-  createdAt?: string
-}
-
-export type ManagedShareItem = {
-  share: {
-    id: number
-    token: string
-    fileId: number
-    createdBy: number
-    expiresAt?: string | null
-    revokedAt?: string | null
-    createdAt?: string
-    updatedAt?: string
-  }
-  fileId: number
-  filename: string
-  mimeType?: string
-  extractCode?: string
-}
-
-export type UploadFilePayload = {
-  uri: string
-  name: string
-  type?: string
-}
 
 export class ApiRequestError extends Error {
   status?: number
@@ -73,6 +42,10 @@ function createRequestKey(path: string, init?: RequestInit): string {
   })
 }
 
+async function parseApiError(res: Response): Promise<ApiErr> {
+  return (await res.json().catch(() => ({}))) as ApiErr
+}
+
 function toUserFriendlyErrorMessage(error: unknown, context: RequestContext = 'generic'): string {
   if (error instanceof ApiRequestError) {
     if (error.isNetworkError) return '网络连接异常，请检查网络后重试。'
@@ -90,143 +63,266 @@ function toUserFriendlyErrorMessage(error: unknown, context: RequestContext = 'g
   return '操作失败，请稍后重试。如仍有问题请联系管理员。'
 }
 
-export function createSdkClient(options: SdkClientOptions) {
-  const apiBaseUrl = options.apiBaseUrl
-  const inflightGetRequests = new Map<string, Promise<unknown>>()
+class SdkClientImpl implements SdkClient {
+  private readonly apiBaseUrl: string
+  private readonly tokenStore?: SdkClientOptions['tokenStore']
+  private readonly fileDownloader?: SdkClientOptions['fileDownloader']
+  private readonly inflightGetRequests = new Map<string, Promise<unknown>>()
 
-  function authHeaders(): Record<string, string> {
-    const token = options.tokenStore?.getToken()
+  constructor(options: SdkClientOptions) {
+    this.apiBaseUrl = options.apiBaseUrl
+    this.tokenStore = options.tokenStore
+    this.fileDownloader = options.fileDownloader
+  }
+
+  private async requestRaw(path: string, init?: RequestInit): Promise<Response> {
+    let res: Response
+    try {
+      res = await fetch(`${this.apiBaseUrl}${path}`, {
+        ...init,
+        headers: {
+          ...(init?.headers || {}),
+        },
+      })
+    } catch {
+      throw new ApiRequestError('网络连接异常，请检查网络后重试。', { isNetworkError: true })
+    }
+
+    if (!res.ok) {
+      const body = await parseApiError(res)
+      throw new ApiRequestError(body.error?.message || `Request failed: ${res.status}`, {
+        status: res.status,
+        code: body.error?.code,
+      })
+    }
+
+    return res
+  }
+
+  private async requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+    const res = await this.requestRaw(path, init)
+    return await res.blob()
+  }
+
+  private async downloadByUrl(url: string, destination: string, headers?: Record<string, string>): Promise<{ uri: string }> {
+    if (!this.fileDownloader) throw new ApiRequestError('当前平台未配置文件下载器。')
+    return await this.fileDownloader(url, destination, { headers })
+  }
+
+  getApiBaseUrl = (): string => this.apiBaseUrl
+
+  authHeaders = (): Record<string, string> => {
+    const token = this.tokenStore?.getToken()
     return token ? ({ Authorization: `Bearer ${token}` } as Record<string, string>) : ({} as Record<string, string>)
   }
 
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     const method = (init?.method ?? 'GET').toUpperCase()
     const shouldDedupe = method === 'GET'
     const dedupeKey = shouldDedupe ? createRequestKey(path, init) : ''
 
     if (shouldDedupe) {
-      const pending = inflightGetRequests.get(dedupeKey)
+      const pending = this.inflightGetRequests.get(dedupeKey)
       if (pending) return pending as Promise<T>
     }
 
     const pending = (async () => {
-      let res: Response
-      try {
-        res = await fetch(`${apiBaseUrl}${path}`, {
-          ...init,
-          headers: {
-            ...(init?.headers || {}),
-          },
-        })
-      } catch {
-        throw new ApiRequestError('网络连接异常，请检查网络后重试。', { isNetworkError: true })
-      }
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as ApiErr
-        throw new ApiRequestError(body.error?.message || `Request failed: ${res.status}`, {
-          status: res.status,
-          code: body.error?.code,
-        })
-      }
+      const res = await this.requestRaw(path, init)
       const json = await res.json()
       return json.data as T
     })()
 
     if (shouldDedupe) {
-      inflightGetRequests.set(dedupeKey, pending)
+      this.inflightGetRequests.set(dedupeKey, pending)
       pending.finally(() => {
-        inflightGetRequests.delete(dedupeKey)
+        this.inflightGetRequests.delete(dedupeKey)
       })
     }
 
     return pending
   }
 
-  return {
-    getApiBaseUrl: () => apiBaseUrl,
-    request,
-    authHeaders,
-    toUserFriendlyErrorMessage,
-    auth: {
-      register: async (email: string, password: string): Promise<{ token?: string }> => {
-        return await request<{ token?: string }>('/api/v1/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        })
-      },
-      login: async (email: string, password: string): Promise<{ token?: string }> => {
-        return await request<{ token?: string }>('/api/v1/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        })
-      },
-      me: async <T>(): Promise<T> => {
-        return await request<T>('/api/v1/auth/me', { headers: { ...authHeaders() } })
-      },
-    },
-    files: {
-      list: async (): Promise<FileItem[]> => {
-        return await request<FileItem[]>('/api/v1/files', { headers: { ...authHeaders() } })
-      },
-      delete: async (id: number): Promise<void> => {
-        await request<void>(`/api/v1/files/${id}`, { method: 'DELETE', headers: { ...authHeaders() } })
-      },
-      move: async (id: number, filename: string): Promise<void> => {
-        await request<void>(`/api/v1/files/${id}/move`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ filename }),
-        })
-      },
-      createFolder: async (filename: string): Promise<FileItem> => {
-        return await request<FileItem>('/api/v1/files/folders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ path: filename }),
-        })
-      },
-      upload: async (file: UploadFilePayload, folderPath = ''): Promise<FileItem> => {
-        const form = new FormData()
-        form.append('file', file as unknown as Blob)
-        form.append('path', folderPath)
-        return await request<FileItem>('/api/v1/files', {
-          method: 'POST',
-          headers: { ...authHeaders() },
-          body: form,
-        })
-      },
-      buildDownloadUrl: (id: number): string => `${apiBaseUrl}/api/v1/files/${id}/download`,
-      buildThumbnailUrl: (id: number): string => `${apiBaseUrl}/api/v1/files/${id}/thumbnail`,
-    },
-    shares: {
-      create: async (fileId: number, expireHours = 72, extractCode = ''): Promise<{ token: string; url: string; expiresAt?: string; extractCode?: string }> => {
-        return await request<{ token: string; url: string; expiresAt?: string; extractCode?: string }>('/api/v1/shares', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ fileId, expireHours, extractCode }),
-        })
-      },
-      getByToken: async (token: string, extractCode?: string): Promise<{ file: { filename: string; id: number; mimeType?: string } }> => {
-        const path = withExtractCode(`/api/v1/shares/${token}`, extractCode)
-        return await request<{ file: { filename: string; id: number; mimeType?: string } }>(path)
-      },
-      listMine: async (): Promise<ManagedShareItem[]> => {
-        return await request<ManagedShareItem[]>('/api/v1/shares', { headers: { ...authHeaders() } })
-      },
-      revoke: async (shareId: number): Promise<void> => {
-        await request<void>(`/api/v1/shares/${shareId}/revoke`, { method: 'PATCH', headers: { ...authHeaders() } })
-      },
-      buildDownloadUrl: (token: string): string => `${apiBaseUrl}/api/v1/shares/${token}/download`,
-      buildThumbnailUrl: (token: string): string => `${apiBaseUrl}/api/v1/shares/${token}/thumbnail`,
-      buildDownloadUrlWithCode: (token: string, extractCode?: string): string =>
-        withExtractCode(`${apiBaseUrl}/api/v1/shares/${token}/download`, extractCode),
-      buildThumbnailUrlWithCode: (token: string, extractCode?: string): string =>
-        withExtractCode(`${apiBaseUrl}/api/v1/shares/${token}/thumbnail`, extractCode),
-    },
+  toUserFriendlyErrorMessage = (error: unknown, context: RequestContext = 'generic'): string =>
+    toUserFriendlyErrorMessage(error, context)
+
+  authRegister = async (email: string, password: string): Promise<AuthTokenResponse> => {
+    return await this.request<AuthTokenResponse>('/api/v1/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
   }
+
+  authLogin = async (email: string, password: string): Promise<AuthTokenResponse> => {
+    return await this.request<AuthTokenResponse>('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+  }
+
+  authMe = async <T>(): Promise<T> => {
+    return await this.request<T>('/api/v1/auth/me', { headers: { ...this.authHeaders() } })
+  }
+
+  filesList = async (path = ''): Promise<FileItem[]> => {
+    const query = path.trim() ? `?path=${encodeURIComponent(path.trim())}` : ''
+    return await this.request<FileItem[]>(`/api/v1/files${query}`, { headers: { ...this.authHeaders() } })
+  }
+
+  fileDelete = async (id: number): Promise<void> => {
+    await this.request<void>(`/api/v1/files/${id}`, { method: 'DELETE', headers: { ...this.authHeaders() } })
+  }
+
+  fileMove = async (id: number, filename: string): Promise<void> => {
+    await this.request<void>(`/api/v1/files/${id}/move`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ filename }),
+    })
+  }
+
+  folderCreate = async (filename: string): Promise<FileItem> => {
+    return await this.request<FileItem>('/api/v1/files/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ path: filename }),
+    })
+  }
+
+  fileUpload = async (file: UploadFilePayload, folderPath = ''): Promise<FileItem> => {
+    const form = new FormData()
+    form.append('file', file as unknown as Blob)
+    form.append('path', folderPath)
+    return await this.request<FileItem>('/api/v1/files', {
+      method: 'POST',
+      headers: { ...this.authHeaders() },
+      body: form,
+    })
+  }
+
+  fileUploadWithProgress = async (
+    file: UploadFilePayload | Blob,
+    folderPath = '',
+    onProgress?: (percent: number) => void,
+  ): Promise<FileItem> => {
+    const form = new FormData()
+    form.append('file', file as unknown as Blob)
+    form.append('path', folderPath)
+
+    return await new Promise<FileItem>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${this.apiBaseUrl}/api/v1/files`)
+
+      const headers = this.authHeaders()
+      for (const [k, v] of Object.entries(headers)) {
+        xhr.setRequestHeader(k, v)
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (!onProgress || !event.lengthComputable) return
+        const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)))
+        onProgress(percent)
+      }
+
+      xhr.onerror = () => {
+        reject(new ApiRequestError('网络连接异常，请检查网络后重试。', { isNetworkError: true }))
+      }
+
+      xhr.onload = () => {
+        const text = xhr.responseText || ''
+        let body: unknown = {}
+        try {
+          body = text ? JSON.parse(text) : {}
+        } catch {
+          body = {}
+        }
+
+        if (xhr.status < 200 || xhr.status >= 300) {
+          const err = body as ApiErr
+          reject(
+            new ApiRequestError(err.error?.message || `Request failed: ${xhr.status}`, {
+              status: xhr.status,
+              code: err.error?.code,
+            }),
+          )
+          return
+        }
+
+        const data = (body as { data?: FileItem }).data
+        if (!data) {
+          reject(new ApiRequestError('上传响应数据异常'))
+          return
+        }
+        onProgress?.(100)
+        resolve(data)
+      }
+
+      xhr.send(form)
+    })
+  }
+
+  fileFetchDownloadBlob = async (id: number): Promise<Blob> => {
+    return await this.requestBlob(`/api/v1/files/${id}/download`, { headers: { ...this.authHeaders() } })
+  }
+
+  fileFetchThumbnailBlob = async (id: number): Promise<Blob> => {
+    return await this.requestBlob(`/api/v1/files/${id}/thumbnail`, { headers: { ...this.authHeaders() } })
+  }
+
+  fileDownloadToFile = async (id: number, destination: string): Promise<{ uri: string }> => {
+    return await this.downloadByUrl(`${this.apiBaseUrl}/api/v1/files/${id}/download`, destination, this.authHeaders())
+  }
+
+  fileDownloadThumbnailToFile = async (id: number, destination: string): Promise<{ uri: string }> => {
+    return await this.downloadByUrl(`${this.apiBaseUrl}/api/v1/files/${id}/thumbnail`, destination, this.authHeaders())
+  }
+
+  fileBuildDownloadUrl = (id: number): string => `${this.apiBaseUrl}/api/v1/files/${id}/download`
+
+  fileBuildThumbnailUrl = (id: number): string => `${this.apiBaseUrl}/api/v1/files/${id}/thumbnail`
+
+  shareCreate = async (fileId: number, expireHours = 72, extractCode = ''): Promise<ShareCreateResponse> => {
+    return await this.request<ShareCreateResponse>('/api/v1/shares', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ fileId, expireHours, extractCode }),
+    })
+  }
+
+  shareGetByToken = async (token: string, extractCode?: string): Promise<ShareGetByTokenResponse> => {
+    return await this.request<ShareGetByTokenResponse>(withExtractCode(`/api/v1/shares/${token}`, extractCode))
+  }
+
+  shareListMine = async (): Promise<ManagedShareItem[]> => {
+    return await this.request<ManagedShareItem[]>('/api/v1/shares', { headers: { ...this.authHeaders() } })
+  }
+
+  shareRevoke = async (shareId: number): Promise<void> => {
+    await this.request<void>(`/api/v1/shares/${shareId}/revoke`, { method: 'PATCH', headers: { ...this.authHeaders() } })
+  }
+
+  shareFetchDownloadBlob = async (token: string, extractCode?: string): Promise<Blob> => {
+    return await this.requestBlob(withExtractCode(`/api/v1/shares/${token}/download`, extractCode))
+  }
+
+  shareFetchThumbnailBlob = async (token: string, extractCode?: string): Promise<Blob> => {
+    return await this.requestBlob(withExtractCode(`/api/v1/shares/${token}/thumbnail`, extractCode))
+  }
+
+  shareBuildDownloadUrl = (token: string): string => `${this.apiBaseUrl}/api/v1/shares/${token}/download`
+
+  shareBuildThumbnailUrl = (token: string): string => `${this.apiBaseUrl}/api/v1/shares/${token}/thumbnail`
+
+  shareBuildDownloadUrlWithCode = (token: string, extractCode?: string): string =>
+    withExtractCode(`${this.apiBaseUrl}/api/v1/shares/${token}/download`, extractCode)
+
+  shareBuildThumbnailUrlWithCode = (token: string, extractCode?: string): string =>
+    withExtractCode(`${this.apiBaseUrl}/api/v1/shares/${token}/thumbnail`, extractCode)
+}
+
+export function createSdkClient(options: SdkClientOptions): SdkClient {
+  return new SdkClientImpl(options)
 }
 
 export { toUserFriendlyErrorMessage }

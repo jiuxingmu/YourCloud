@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { Box, Button, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
+import { getBaseName, getParentPath } from '@yourcloud/sdk'
 import { ViewModeSwitch } from './ViewModeSwitch'
-import { formatModified, getBaseName, getParentPath, getTrashClearFeedbackText, type DeletedItem, type FileSection } from '../domain'
+import { formatModified, getTrashClearFeedbackText, type DeletedItem, type FileSection } from '../domain'
 
 type Props = {
   section: FileSection

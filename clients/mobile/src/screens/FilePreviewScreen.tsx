@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { WebView } from 'react-native-webview';
+import { classifyPreviewKind, isDirectoryItem } from '@yourcloud/sdk';
 import { useSdkClient } from '../context/SdkClientContext';
 import type { RootStackParamList } from '../navigation/types';
-import { classifyPreviewKind, isDirectoryItem } from '../utils/previewKind';
 
 type Route = RouteProp<RootStackParamList, 'FilePreview'>;
 
@@ -30,8 +30,6 @@ export function FilePreviewScreen() {
     }
 
     let cancelled = false;
-    const headers = { ...client.authHeaders() };
-
     async function load() {
       setLoading(true);
       setError('');
@@ -41,18 +39,16 @@ export function FilePreviewScreen() {
       try {
         const base = FileSystem.cacheDirectory ?? '';
         if (kind === 'image') {
-          const url = client.files.buildThumbnailUrl(fileId);
           const dest = `${base}preview_thumb_${fileId}_${Date.now()}.bin`;
-          const res = await FileSystem.downloadAsync(url, dest, { headers });
+          const res = await client.fileDownloadThumbnailToFile(fileId, dest);
           if (!cancelled) setImageUri(res.uri);
         } else if (kind === 'text') {
-          const url = client.files.buildDownloadUrl(fileId);
           const dest = `${base}preview_txt_${fileId}_${Date.now()}.txt`;
-          await FileSystem.downloadAsync(url, dest, { headers });
+          await client.fileDownloadToFile(fileId, dest);
           const raw = await FileSystem.readAsStringAsync(dest);
           if (!cancelled) setTextContent(raw.slice(0, 12000));
         } else if (kind === 'document') {
-          if (!cancelled) setPdfUrl(client.files.buildDownloadUrl(fileId));
+          if (!cancelled) setPdfUrl(client.fileBuildDownloadUrl(fileId));
         }
       } catch (e) {
         if (!cancelled) setError(client.toUserFriendlyErrorMessage(e, 'files'));

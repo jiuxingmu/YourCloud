@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyPreviewKind } from './filePreviewKind'
+import { classifyPreviewKind } from '@yourcloud/sdk'
 import { shouldFetchPreviewSource } from './FilePreview'
 
 describe('classifyPreviewKind', () => {

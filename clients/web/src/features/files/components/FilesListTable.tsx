@@ -1,7 +1,8 @@
 import { Fragment } from 'react'
 import { Box, Button, IconButton, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
+import { getBaseName } from '@yourcloud/sdk'
 import { DownloadLineIcon, MoreIcon, ShareLineIcon } from '../../../shared/icons/YourCloudIcons'
-import { canDownloadFile, formatDisplayFileSize, formatModified, getBaseName, type FileItem, type FileSection } from '../domain'
+import { canDownloadFile, formatDisplayFileSize, formatModified, type FileItem, type FileSection } from '../domain'
 import { FileTypeBadge } from './FileTypeBadge'
 
 type Props = {

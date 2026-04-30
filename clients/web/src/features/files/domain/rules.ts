@@ -1,5 +1,4 @@
-import { formatBytes } from '../../../shared/formatters/bytes'
-import { getBaseName } from './path'
+import { formatBytes, getBaseName } from '@yourcloud/sdk'
 import type { DeletedItem, FileItem, FileSection } from './types'
 
 export function shouldShowCreateActions(section: FileSection): boolean {

@@ -28,7 +28,7 @@ export function ShareAccessScreen() {
     setStatus('');
     setResolved(null);
     try {
-      const data = await client.shares.getByToken(cleanedToken, extractCode.trim());
+      const data = await client.shareGetByToken(cleanedToken, extractCode.trim());
       setResolved({
         token: cleanedToken,
         filename: data.file.filename,
@@ -46,7 +46,7 @@ export function ShareAccessScreen() {
     setDownloading(true);
     setStatus('');
     try {
-      await Linking.openURL(client.shares.buildDownloadUrlWithCode(resolved.token, extractCode.trim()));
+      await Linking.openURL(client.shareBuildDownloadUrlWithCode(resolved.token, extractCode.trim()));
       setStatus('正在下载分享文件...');
     } catch (error) {
       setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
