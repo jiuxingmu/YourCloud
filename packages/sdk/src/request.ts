@@ -149,18 +149,18 @@ export function createSdkClient(options: SdkClientOptions) {
     authHeaders,
     toUserFriendlyErrorMessage,
     auth: {
-      register: async (account: string, password: string): Promise<{ token?: string }> => {
+      register: async (email: string, password: string): Promise<{ token?: string }> => {
         return await request<{ token?: string }>('/api/v1/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account, password }),
+          body: JSON.stringify({ email, password }),
         })
       },
-      login: async (account: string, password: string): Promise<{ token?: string }> => {
+      login: async (email: string, password: string): Promise<{ token?: string }> => {
         return await request<{ token?: string }>('/api/v1/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account, password }),
+          body: JSON.stringify({ email, password }),
         })
       },
       me: async <T>(): Promise<T> => {

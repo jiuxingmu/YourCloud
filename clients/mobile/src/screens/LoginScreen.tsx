@@ -8,7 +8,7 @@ type Props = {
 
 export function LoginScreen({ onLoggedIn }: Props) {
   const client = useSdkClient();
-  const [account, setAccount] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('请登录');
   const [submitting, setSubmitting] = useState(false);
@@ -17,7 +17,7 @@ export function LoginScreen({ onLoggedIn }: Props) {
     setSubmitting(true);
     setStatus('登录中...');
     try {
-      const data = await client.auth.login(account.trim(), password);
+      const data = await client.auth.login(email.trim().toLowerCase(), password);
       if (!data.token) {
         setStatus('登录失败：未返回 token');
         return;
@@ -34,8 +34,8 @@ export function LoginScreen({ onLoggedIn }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>YourCloud Login</Text>
-      <Text style={styles.label}>账号</Text>
-      <TextInput value={account} onChangeText={setAccount} style={styles.input} autoCapitalize="none" />
+      <Text style={styles.label}>邮箱</Text>
+      <TextInput value={email} onChangeText={setEmail} style={styles.input} autoCapitalize="none" />
       <Text style={styles.label}>密码</Text>
       <TextInput value={password} onChangeText={setPassword} style={styles.input} secureTextEntry autoCapitalize="none" />
       <Pressable style={[styles.button, submitting && styles.buttonDisabled]} disabled={submitting} onPress={handleLogin}>
