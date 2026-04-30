@@ -1,45 +1,38 @@
-import { authHeaders, getApiBaseUrl as getClientApiBaseUrl, request } from '../../../apiClient'
+import { authHeaders, sdkClient } from '../../../apiClient'
 import type { FileItem } from '../domain'
-
-const API_BASE_URL = getClientApiBaseUrl()
+import type { ManagedShareItem } from '@yourcloud/sdk'
+export type { ManagedShareItem } from '@yourcloud/sdk'
 
 export function getApiBaseUrl(): string {
-  return API_BASE_URL
+  return sdkClient.getApiBaseUrl()
 }
 
 export function buildFileDownloadUrl(id: number): string {
-  return `${API_BASE_URL}/api/v1/files/${id}/download`
+  return sdkClient.files.buildDownloadUrl(id)
 }
 
 export function buildFileThumbnailUrl(id: number): string {
-  return `${API_BASE_URL}/api/v1/files/${id}/thumbnail`
+  return sdkClient.files.buildThumbnailUrl(id)
 }
 
 export function buildShareDownloadUrl(token: string): string {
-  return `${API_BASE_URL}/api/v1/shares/${token}/download`
+  return sdkClient.shares.buildDownloadUrl(token)
 }
 
 export function buildShareThumbnailUrl(token: string): string {
-  return `${API_BASE_URL}/api/v1/shares/${token}/thumbnail`
-}
-
-function withExtractCode(url: string, extractCode?: string): string {
-  const code = extractCode?.trim()
-  if (!code) return url
-  const separator = url.includes('?') ? '&' : '?'
-  return `${url}${separator}extractCode=${encodeURIComponent(code)}`
+  return sdkClient.shares.buildThumbnailUrl(token)
 }
 
 export function buildShareDownloadUrlWithCode(token: string, extractCode?: string): string {
-  return withExtractCode(buildShareDownloadUrl(token), extractCode)
+  return sdkClient.shares.buildDownloadUrlWithCode(token, extractCode)
 }
 
 export function buildShareThumbnailUrlWithCode(token: string, extractCode?: string): string {
-  return withExtractCode(buildShareThumbnailUrl(token), extractCode)
+  return sdkClient.shares.buildThumbnailUrlWithCode(token, extractCode)
 }
 
 export async function listFiles(): Promise<FileItem[]> {
-  return await request<FileItem[]>('/api/v1/files', { headers: { ...authHeaders() } })
+  return await sdkClient.files.list()
 }
 
 export async function uploadFile(file: File, folderPath = ''): Promise<FileItem> {
@@ -53,7 +46,7 @@ export async function uploadFileWithProgress(file: File, folderPath = '', onProg
 
   return await new Promise<FileItem>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', `${API_BASE_URL}/api/v1/files`)
+    xhr.open('POST', `${sdkClient.getApiBaseUrl()}/api/v1/files`)
 
     const headers = authHeaders()
     for (const [k, v] of Object.entries(headers)) {
@@ -99,59 +92,29 @@ export async function uploadFileWithProgress(file: File, folderPath = '', onProg
 }
 
 export async function deleteFile(id: number): Promise<void> {
-  await request<void>(`/api/v1/files/${id}`, { method: 'DELETE', headers: { ...authHeaders() } })
+  await sdkClient.files.delete(id)
 }
 
 export async function moveFile(id: number, filename: string): Promise<void> {
-  await request<void>(`/api/v1/files/${id}/move`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ filename }),
-  })
+  await sdkClient.files.move(id, filename)
 }
 
 export async function createFolder(filename: string): Promise<FileItem> {
-  return await request<FileItem>('/api/v1/files/folders', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ path: filename }),
-  })
+  return await sdkClient.files.createFolder(filename)
 }
 
 export async function createShare(fileId: number, expireHours = 72, extractCode = ''): Promise<{ token: string; url: string; expiresAt?: string; extractCode?: string }> {
-  return await request<{ token: string; url: string; expiresAt?: string; extractCode?: string }>('/api/v1/shares', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ fileId, expireHours, extractCode }),
-  })
+  return await sdkClient.shares.create(fileId, expireHours, extractCode)
 }
 
 export async function getShare(token: string, extractCode?: string): Promise<{ file: { filename: string; id: number; mimeType?: string } }> {
-  const path = withExtractCode(`/api/v1/shares/${token}`, extractCode)
-  return await request<{ file: { filename: string; id: number; mimeType?: string } }>(path)
-}
-
-export type ManagedShareItem = {
-  share: {
-    id: number
-    token: string
-    fileId: number
-    createdBy: number
-    expiresAt?: string | null
-    revokedAt?: string | null
-    createdAt?: string
-    updatedAt?: string
-  }
-  fileId: number
-  filename: string
-  mimeType?: string
-  extractCode?: string
+  return await sdkClient.shares.getByToken(token, extractCode)
 }
 
 export async function listMyShares(): Promise<ManagedShareItem[]> {
-  return await request<ManagedShareItem[]>('/api/v1/shares', { headers: { ...authHeaders() } })
+  return await sdkClient.shares.listMine()
 }
 
 export async function revokeShare(shareId: number): Promise<void> {
-  await request<void>(`/api/v1/shares/${shareId}/revoke`, { method: 'PATCH', headers: { ...authHeaders() } })
+  await sdkClient.shares.revoke(shareId)
 }
