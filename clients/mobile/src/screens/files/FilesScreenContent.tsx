@@ -37,7 +37,10 @@ export function FilesScreen() {
   const latestLoadRequestRef = useRef(0);
 
   const currentPath = pathStack[pathStack.length - 1] || '/';
-  const pathLabel = useMemo(() => (currentPath === '/' ? '根目录 /' : currentPath), [currentPath]);
+  const pathLabel = useMemo(() => {
+    if (currentPath === '/') return '/';
+    return `/${normalizePath(currentPath)}`;
+  }, [currentPath]);
 
   useFocusEffect(
     useCallback(() => {

@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { MotiView } from 'moti';
 import { Image, Text, View } from 'react-native';
-import { isDirectoryItem, type FileItem } from '@yourcloud/sdk';
+import { getBaseName, isDirectoryItem, type FileItem } from '@yourcloud/sdk';
 import { ScalePressable } from '../../ui/ScalePressable';
 import { filesStyles as styles } from './filesStyles';
 import { formatFileDate, formatFileSize, getFilePlaceholderColor } from './fileFormatters';
@@ -18,6 +18,7 @@ type FileListItemProps = {
 export function FileListItem({ item, index, authHeaders, buildThumbnailUrl, onOpen, onMore }: FileListItemProps) {
   const isFolder = isDirectoryItem(item.filename, item.mimeType);
   const thumbnailUri = item.mimeType?.startsWith('image/') ? buildThumbnailUrl(item.id) : null;
+  const displayName = getBaseName(item.filename) || item.filename;
 
   return (
     <MotiView from={{ opacity: 0, translateY: 10 }} animate={{ opacity: 1, translateY: 0 }} transition={{ delay: index * 50, type: 'timing', duration: 240 }}>
@@ -33,7 +34,7 @@ export function FileListItem({ item, index, authHeaders, buildThumbnailUrl, onOp
         </View>
         <View style={styles.fileInfo}>
           <Text style={styles.fileName} numberOfLines={1}>
-            {item.filename}
+            {displayName}
           </Text>
           <Text style={styles.fileMeta}>
             {formatFileSize(item.size)} · {formatFileDate(item.updatedAt || item.createdAt)}
