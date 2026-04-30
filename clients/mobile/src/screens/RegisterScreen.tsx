@@ -17,6 +17,10 @@ export function RegisterScreen({ onLoggedIn, onGoLogin }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState('');
 
+  function normalizeEmailInput(input: string): string {
+    return input.replace(/[。．]/g, '.').replace(/＠/g, '@').replace(/\s/g, '');
+  }
+
   function validate(): boolean {
     const normalizedEmail = email.trim().toLowerCase();
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,9 +70,10 @@ export function RegisterScreen({ onLoggedIn, onGoLogin }: Props) {
         <Feather name="mail" size={18} color="#6B7280" style={styles.leftIcon} />
         <TextInput
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(text) => setEmail(normalizeEmailInput(text))}
           style={styles.input}
           autoCapitalize="none"
+          autoCorrect={false}
           keyboardType="email-address"
           placeholder="you@example.com"
           placeholderTextColor="#94A3B8"
