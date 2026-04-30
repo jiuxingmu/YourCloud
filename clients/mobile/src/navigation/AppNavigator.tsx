@@ -4,12 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { FilePreviewScreen } from '../screens/FilePreviewScreen';
-import { FilesScreen } from '../screens/FilesScreen';
-import { LocalFilesScreen } from '../screens/LocalFilesScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
-import { ShareAccessScreen } from '../screens/ShareAccessScreen';
-import { SharesScreen } from '../screens/SharesScreen';
+import { FilePreviewScreen, FilesScreen, LocalFilesScreen, ProfileScreen, ShareAccessScreen, SharesScreen } from '../screens';
 import type { MainTabParamList, RootStackParamList } from './types';
 import { AppTheme } from '../ui/theme';
 
