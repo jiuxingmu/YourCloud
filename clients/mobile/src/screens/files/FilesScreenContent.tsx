@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActionSheetIOS, Alert, FlatList, Linking, Platform, RefreshControl, Share, Text, View } from 'react-native';
 import { MotiPressable } from 'moti/interactions';
@@ -35,6 +35,7 @@ export function FilesScreen() {
   const [creatingShare, setCreatingShare] = useState(false);
   const [pathStack, setPathStack] = useState<string[]>(['/']);
   const latestLoadRequestRef = useRef(0);
+  const memoryCacheRef = useRef<Map<string, FileItem[]>>(new Map());
 
   const currentPath = pathStack[pathStack.length - 1] || '/';
   const pathLabel = useMemo(() => {
@@ -42,13 +43,13 @@ export function FilesScreen() {
     return `/${normalizePath(currentPath)}`;
   }, [currentPath]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadFiles(currentPath);
-    }, [currentPath]),
-  );
-
   useEffect(() => {
+    const cacheKey = normalizePath(currentPath);
+    const cached = memoryCacheRef.current.get(cacheKey);
+    if (cached) {
+      setFiles(cached);
+      return;
+    }
     void loadFiles(currentPath);
   }, [currentPath]);
 
@@ -152,13 +153,23 @@ export function FilesScreen() {
     return [...Array.from(uniqueFoldersByPath.values()), ...directFiles.filter((f) => f.mimeType !== 'inode/directory')];
   }
 
-  async function loadFiles(path = '/') {
+  async function loadFiles(path = '/', options?: { force?: boolean }) {
+    const cacheKey = normalizePath(path);
+    if (!options?.force) {
+      const cached = memoryCacheRef.current.get(cacheKey);
+      if (cached) {
+        setFiles(cached);
+        return;
+      }
+    }
     const requestId = ++latestLoadRequestRef.current;
     setLoading(true);
     try {
       const data = await client.filesList(path === '/' ? '' : path);
       if (requestId !== latestLoadRequestRef.current) return;
-      setFiles(sortFileItems(deriveCurrentPathItems(data, path)));
+      const nextFiles = sortFileItems(deriveCurrentPathItems(data, path));
+      memoryCacheRef.current.set(cacheKey, nextFiles);
+      setFiles(nextFiles);
       setStatus('');
     } catch (error) {
       if (requestId !== latestLoadRequestRef.current) return;
@@ -171,7 +182,7 @@ export function FilesScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await loadFiles(currentPath);
+    await loadFiles(currentPath, { force: true });
     setRefreshing(false);
   }
 
@@ -188,7 +199,7 @@ export function FilesScreen() {
         },
         currentPath === '/' ? '' : currentPath,
       );
-      await loadFiles(currentPath);
+      await loadFiles(currentPath, { force: true });
     } catch (error) {
       setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
     }
@@ -203,7 +214,7 @@ export function FilesScreen() {
       await client.folderCreate(fullPath);
       setFolderName('');
       setCreateFolderVisible(false);
-      await loadFiles(currentPath);
+      await loadFiles(currentPath, { force: true });
     } catch (error) {
       setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
     } finally {
@@ -230,7 +241,7 @@ export function FilesScreen() {
   async function deleteFile(fileId: number) {
     try {
       await client.fileDelete(fileId);
-      await loadFiles(currentPath);
+      await loadFiles(currentPath, { force: true });
     } catch (error) {
       setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
     }
