@@ -1,22 +1,17 @@
-import { useNavigation } from '@react-navigation/native';
-import { useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import type { FileItem } from '@yourcloud/sdk';
-import { useAuthenticatedSession } from '../context/AuthenticatedSessionContext';
 import { useSdkClient } from '../context/SdkClientContext';
 import type { RootStackParamList } from '../navigation/types';
+import { AppTheme } from '../ui/theme';
 import { isDirectoryItem } from '../utils/previewKind';
 
 export function FilesScreen() {
   const client = useSdkClient();
-  const { onLogout, initialApiBaseUrl, onApiBaseUrlChange } = useAuthenticatedSession();
   const navigation = useNavigation();
-
-  const [apiBaseUrl, setApiBaseUrl] = useState(initialApiBaseUrl);
-  const [healthStatus, setHealthStatus] = useState('未检查');
   const [filesStatus, setFilesStatus] = useState('未加载');
-  const [checking, setChecking] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -41,18 +36,6 @@ export function FilesScreen() {
     }
   }
 
-  async function checkHealth() {
-    setChecking(true);
-    try {
-      const data = await client.request<{ status: string }>('/health');
-      setHealthStatus(`健康检查成功: ${data.status}`);
-    } catch (error) {
-      setHealthStatus(client.toUserFriendlyErrorMessage(error));
-    } finally {
-      setChecking(false);
-    }
-  }
-
   async function loadFiles() {
     setLoadingFiles(true);
     setFilesStatus('加载中...');
@@ -67,9 +50,11 @@ export function FilesScreen() {
     }
   }
 
-  async function applyApiBaseUrl() {
-    await onApiBaseUrlChange(apiBaseUrl.trim() || 'http://10.0.2.2:8080');
-  }
+  useFocusEffect(
+    useCallback(() => {
+      void loadFiles();
+    }, []),
+  );
 
   async function pickAndUploadFile() {
     setUploading(true);
@@ -80,7 +65,6 @@ export function FilesScreen() {
         setFilesStatus('已取消选择');
         return;
       }
-
       const picked = result.assets[0];
       await client.files.upload({
         uri: picked.uri,
@@ -151,25 +135,20 @@ export function FilesScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>YourCloud Files</Text>
-      <Text style={styles.label}>API Base URL</Text>
-      <TextInput value={apiBaseUrl} onChangeText={setApiBaseUrl} style={styles.input} autoCapitalize="none" />
-      <Pressable style={styles.secondaryButton} onPress={applyApiBaseUrl}>
-        <Text style={styles.secondaryButtonText}>应用地址</Text>
-      </Pressable>
+      <Text style={styles.title}>云盘</Text>
+      <Text style={styles.subtitle}>你的云端文件与文件夹</Text>
 
       <View style={styles.buttonRow}>
-        <Pressable style={[styles.button, checking && styles.buttonDisabled]} onPress={checkHealth} disabled={checking}>
-          <Text style={styles.buttonText}>{checking ? '检查中...' : '检查 /health'}</Text>
-        </Pressable>
         <Pressable style={[styles.button, loadingFiles && styles.buttonDisabled]} onPress={loadFiles} disabled={loadingFiles}>
-          <Text style={styles.buttonText}>{loadingFiles ? '加载中...' : '加载文件列表'}</Text>
+          <Text style={styles.buttonText}>{loadingFiles ? '加载中...' : '刷新列表'}</Text>
+        </Pressable>
+        <Pressable style={[styles.button, uploading && styles.buttonDisabled]} onPress={pickAndUploadFile} disabled={uploading}>
+          <Text style={styles.buttonText}>{uploading ? '上传中...' : '上传文件'}</Text>
         </Pressable>
       </View>
-      <Pressable style={[styles.button, uploading && styles.buttonDisabled, { marginTop: 10 }]} onPress={pickAndUploadFile} disabled={uploading}>
-        <Text style={styles.buttonText}>{uploading ? '上传中...' : '选择文件并上传'}</Text>
-      </Pressable>
-      <View style={styles.folderRow}>
+
+      <View style={[styles.folderBox, styles.card]}>
+        <Text style={styles.label}>新建文件夹</Text>
         <TextInput
           value={folderName}
           onChangeText={setFolderName}
@@ -182,11 +161,6 @@ export function FilesScreen() {
         </Pressable>
       </View>
 
-      <Pressable style={styles.secondaryButton} onPress={onLogout}>
-        <Text style={styles.secondaryButtonText}>退出登录</Text>
-      </Pressable>
-
-      <Text style={styles.status}>{healthStatus}</Text>
       <Text style={styles.status}>{filesStatus}</Text>
       {shareStatus ? <Text style={styles.status}>{shareStatus}</Text> : null}
 
@@ -194,7 +168,7 @@ export function FilesScreen() {
         data={files}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => (
-          <View style={styles.fileRowContainer}>
+          <View style={[styles.fileRowContainer, styles.card]}>
             <Text style={styles.fileRowText}>
               {item.filename} ({item.size} B)
             </Text>
@@ -231,91 +205,75 @@ export function FilesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 40,
+    backgroundColor: AppTheme.colors.bg,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   title: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '700',
-    marginBottom: 24,
+    color: AppTheme.colors.text,
+  },
+  subtitle: {
+    marginTop: 4,
+    marginBottom: 14,
+    color: AppTheme.colors.textSecondary,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  button: {
+    backgroundColor: AppTheme.colors.primary,
+    borderRadius: AppTheme.radius.md,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    flex: 1,
+  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  folderBox: {
+    marginTop: 12,
+    marginBottom: 2,
+    padding: 12,
   },
   label: {
     fontSize: 14,
     marginBottom: 8,
-    color: '#222',
+    color: AppTheme.colors.text,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d0d7de',
-    borderRadius: 8,
+    borderColor: AppTheme.colors.border,
+    borderRadius: AppTheme.radius.md,
+    backgroundColor: '#fff',
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
     marginBottom: 10,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  button: {
-    backgroundColor: '#1f6feb',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    flex: 1,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  secondaryButton: {
-    marginTop: 10,
-    borderColor: '#1f6feb',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: '#1f6feb',
-    fontWeight: '600',
-    fontSize: 14,
+  folderInput: { marginBottom: 8 },
+  folderButton: {
+    marginTop: 2,
+    minWidth: 84,
+    alignSelf: 'flex-end',
   },
   status: {
     marginTop: 10,
     fontSize: 14,
-    color: '#333',
+    color: AppTheme.colors.textSecondary,
   },
   fileRow: {
     paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    color: '#222',
-  },
-  folderRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  folderInput: {
-    flex: 1,
-    marginBottom: 0,
-  },
-  folderButton: {
-    flex: 0,
-    minWidth: 72,
+    color: AppTheme.colors.text,
+    textAlign: 'center',
+    marginTop: 16,
   },
   fileRowContainer: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -323,55 +281,46 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   fileRowText: {
-    color: '#222',
+    color: AppTheme.colors.text,
     flexBasis: '100%',
+    fontWeight: '600',
   },
   previewButton: {
     borderWidth: 1,
-    borderColor: '#8250df',
-    borderRadius: 6,
+    borderColor: '#7C3AED',
+    borderRadius: AppTheme.radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  previewButtonText: {
-    color: '#8250df',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  previewButtonText: { color: '#7C3AED', fontSize: 12, fontWeight: '600' },
   deleteButton: {
     borderWidth: 1,
-    borderColor: '#cf222e',
-    borderRadius: 6,
+    borderColor: AppTheme.colors.danger,
+    borderRadius: AppTheme.radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  deleteButtonText: {
-    color: '#cf222e',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  deleteButtonText: { color: AppTheme.colors.danger, fontSize: 12, fontWeight: '600' },
   shareButton: {
     borderWidth: 1,
-    borderColor: '#1f6feb',
-    borderRadius: 6,
+    borderColor: AppTheme.colors.primary,
+    borderRadius: AppTheme.radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  shareButtonText: {
-    color: '#1f6feb',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  shareButtonText: { color: AppTheme.colors.primary, fontSize: 12, fontWeight: '600' },
   downloadButton: {
     borderWidth: 1,
-    borderColor: '#656d76',
-    borderRadius: 6,
+    borderColor: '#64748B',
+    borderRadius: AppTheme.radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  downloadButtonText: {
-    color: '#656d76',
-    fontSize: 12,
-    fontWeight: '600',
+  downloadButtonText: { color: '#64748B', fontSize: 12, fontWeight: '600' },
+  card: {
+    backgroundColor: AppTheme.colors.card,
+    borderRadius: AppTheme.radius.lg,
+    borderWidth: 1,
+    borderColor: AppTheme.colors.border,
   },
 });

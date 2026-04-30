@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ManagedShareItem } from '@yourcloud/sdk';
 import { useSdkClient } from '../context/SdkClientContext';
+import { AppTheme } from '../ui/theme';
 
 export function SharesScreen() {
   const client = useSdkClient();
@@ -46,6 +47,7 @@ export function SharesScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>我的分享</Text>
+      <Text style={styles.subtitle}>管理你分享出去的链接</Text>
       <Pressable style={[styles.refresh, loading && styles.disabled]} onPress={loadShares} disabled={loading}>
         <Text style={styles.refreshText}>{loading ? '刷新中...' : '刷新'}</Text>
       </Pressable>
@@ -86,20 +88,26 @@ export function SharesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: AppTheme.colors.bg,
     paddingHorizontal: 16,
     paddingTop: 16,
   },
   title: {
-    fontSize: 20,
+    fontSize: 26,
     fontWeight: '700',
+    color: AppTheme.colors.text,
+  },
+  subtitle: {
+    color: AppTheme.colors.textSecondary,
+    marginTop: 4,
     marginBottom: 12,
   },
   refresh: {
     alignSelf: 'flex-start',
-    backgroundColor: '#1f6feb',
+    backgroundColor: AppTheme.colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: AppTheme.radius.md,
     marginBottom: 8,
   },
   refreshText: {
@@ -111,15 +119,19 @@ const styles = StyleSheet.create({
   },
   status: {
     fontSize: 14,
-    color: '#555',
+    color: AppTheme.colors.textSecondary,
     marginBottom: 8,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: AppTheme.colors.border,
+    borderRadius: AppTheme.radius.lg,
+    backgroundColor: AppTheme.colors.card,
+    paddingHorizontal: 12,
     gap: 8,
   },
   rowMain: {
@@ -128,11 +140,11 @@ const styles = StyleSheet.create({
   filename: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#222',
+    color: AppTheme.colors.text,
   },
   meta: {
     fontSize: 12,
-    color: '#666',
+    color: AppTheme.colors.textSecondary,
     marginTop: 4,
   },
   revoked: {
@@ -142,13 +154,13 @@ const styles = StyleSheet.create({
   },
   revokeBtn: {
     borderWidth: 1,
-    borderColor: '#cf222e',
-    borderRadius: 6,
+    borderColor: AppTheme.colors.danger,
+    borderRadius: AppTheme.radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   revokeText: {
-    color: '#cf222e',
+    color: AppTheme.colors.danger,
     fontWeight: '600',
     fontSize: 12,
   },

@@ -1,4 +1,4 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSdkClient } from '../context/SdkClientContext';
@@ -6,17 +6,16 @@ import { AppTheme } from '../ui/theme';
 
 type Props = {
   onLoggedIn: (token: string) => Promise<void>;
-  onGoRegister: () => void;
+  onGoLogin: () => void;
 };
 
-export function LoginScreen({ onLoggedIn, onGoRegister }: Props) {
+export function RegisterScreen({ onLoggedIn, onGoLogin }: Props) {
   const client = useSdkClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [status, setStatus] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState('');
 
   function validate(): boolean {
     const normalizedEmail = email.trim().toLowerCase();
@@ -30,7 +29,7 @@ export function LoginScreen({ onLoggedIn, onGoRegister }: Props) {
       return false;
     }
     if (password.length < 6) {
-      Alert.alert('提示', '密码至少需要 6 位');
+      Alert.alert('提示', '注册密码至少需要 6 位');
       return false;
     }
     return true;
@@ -39,18 +38,19 @@ export function LoginScreen({ onLoggedIn, onGoRegister }: Props) {
   async function submit() {
     if (!validate()) return;
     setSubmitting(true);
-    setStatus('登录中...');
+    setStatus('注册中...');
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const data = await client.auth.login(normalizedEmail, password);
-      if (!data.token) {
-        setStatus('登录失败：未返回 token');
+      await client.auth.register(normalizedEmail, password);
+      const loginData = await client.auth.login(normalizedEmail, password);
+      if (!loginData.token) {
+        setStatus('注册成功，请返回登录');
         return;
       }
-      await onLoggedIn(data.token);
-      setStatus('登录成功');
-    } catch (error) {
-      setStatus(client.toUserFriendlyErrorMessage(error, 'auth'));
+      await onLoggedIn(loginData.token);
+      setStatus('注册并登录成功');
+    } catch (e) {
+      setStatus(client.toUserFriendlyErrorMessage(e, 'auth'));
     } finally {
       setSubmitting(false);
     }
@@ -58,8 +58,9 @@ export function LoginScreen({ onLoggedIn, onGoRegister }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>YourCloud</Text>
-      <Text style={styles.subtitle}>不限速、跨平台、可自部署的云盘</Text>
+      <Text style={styles.title}>创建账号</Text>
+      <Text style={styles.subtitle}>注册后即可访问你的云盘</Text>
+
       <Text style={styles.label}>邮箱</Text>
       <View style={styles.inputWrap}>
         <Feather name="mail" size={18} color="#6B7280" style={styles.leftIcon} />
@@ -83,7 +84,7 @@ export function LoginScreen({ onLoggedIn, onGoRegister }: Props) {
           style={styles.input}
           secureTextEntry={!showPassword}
           autoCapitalize="none"
-          placeholder="请输入密码"
+          placeholder="至少 6 位"
           placeholderTextColor="#94A3B8"
         />
         <Pressable onPress={() => setShowPassword((v) => !v)} style={styles.eyeBtn}>
@@ -91,26 +92,15 @@ export function LoginScreen({ onLoggedIn, onGoRegister }: Props) {
         </Pressable>
       </View>
 
-      <View style={styles.rememberRow}>
-        <Pressable style={styles.rememberToggle} onPress={() => setRememberMe((v) => !v)}>
-          <Ionicons name={rememberMe ? 'checkbox' : 'square-outline'} size={20} color={AppTheme.colors.primary} />
-          <Text style={styles.rememberText}>记住我</Text>
-        </Pressable>
-      </View>
-
       <Pressable style={({ pressed }) => [styles.button, submitting && styles.buttonDisabled, pressed && styles.buttonPressed]} disabled={submitting} onPress={submit}>
-        <Text style={styles.buttonText}>{submitting ? '处理中...' : '登录'}</Text>
+        <Text style={styles.buttonText}>{submitting ? '处理中...' : '创建账户'}</Text>
       </Pressable>
 
-      <Pressable>
-        <Text style={styles.linkText}>忘记密码？</Text>
+      <Pressable onPress={onGoLogin}>
+        <Text style={styles.secondaryLink}>已有账号？返回登录</Text>
       </Pressable>
 
-      <Pressable onPress={onGoRegister}>
-        <Text style={styles.secondaryLink}>没有账号？去注册</Text>
-      </Pressable>
-
-      {status ? <Text style={styles.status}>{status}</Text> : null}
+      {!!status && <Text style={styles.status}>{status}</Text>}
     </View>
   );
 }
@@ -165,20 +155,6 @@ const styles = StyleSheet.create({
     right: 12,
     top: 11,
   },
-  rememberRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  rememberToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  rememberText: {
-    color: AppTheme.colors.textSecondary,
-  },
   button: {
     backgroundColor: AppTheme.colors.primary,
     borderRadius: AppTheme.radius.md,
@@ -196,12 +172,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 15,
-  },
-  linkText: {
-    color: AppTheme.colors.primary,
-    marginTop: 12,
-    textAlign: 'right',
-    fontWeight: '500',
   },
   secondaryLink: {
     marginTop: 16,

@@ -4,6 +4,8 @@ export type RootStackParamList = {
 };
 
 export type MainTabParamList = {
-  Files: undefined;
+  Cloud: undefined;
+  Local: undefined;
   Shares: undefined;
+  Profile: undefined;
 };
