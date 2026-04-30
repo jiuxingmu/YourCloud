@@ -112,6 +112,28 @@ describe('FilesPage helpers', () => {
     expect(derived[0].filename).toBe('docs/new-folder')
   })
 
+  it('keeps duplicate file entries with same path in drive list', () => {
+    const files = [
+      { id: 10, filename: 'docs/report.txt', size: 1, mimeType: 'text/plain', updatedAt: '2026-01-01T00:00:00Z', createdAt: '2026-01-01T00:00:00Z' },
+      { id: 11, filename: 'docs/report.txt', size: 2, mimeType: 'text/plain', updatedAt: '2026-01-01T00:00:01Z', createdAt: '2026-01-01T00:00:01Z' },
+    ]
+    const derived = deriveDriveItems(files, 'docs')
+    expect(derived).toHaveLength(2)
+    expect(derived.map((item) => item.id)).toEqual([10, 11])
+  })
+
+  it('deduplicates folders but still keeps duplicate files', () => {
+    const files = [
+      { id: 1, filename: 'docs/dup-folder', size: 0, mimeType: 'inode/directory', updatedAt: '2026-01-01T00:00:00Z', createdAt: '2026-01-01T00:00:00Z' },
+      { id: 2, filename: 'docs/dup-folder', size: 0, mimeType: 'inode/directory', updatedAt: '2026-01-01T00:00:01Z', createdAt: '2026-01-01T00:00:01Z' },
+      { id: 3, filename: 'docs/same-name.txt', size: 1, mimeType: 'text/plain', updatedAt: '2026-01-01T00:00:00Z', createdAt: '2026-01-01T00:00:00Z' },
+      { id: 4, filename: 'docs/same-name.txt', size: 2, mimeType: 'text/plain', updatedAt: '2026-01-01T00:00:01Z', createdAt: '2026-01-01T00:00:01Z' },
+    ]
+    const derived = deriveDriveItems(files, 'docs')
+    expect(derived.filter((item) => item.mimeType === 'inode/directory').map((item) => item.id)).toEqual([2])
+    expect(derived.filter((item) => item.mimeType !== 'inode/directory').map((item) => item.id)).toEqual([3, 4])
+  })
+
   it('keeps folders before files and sorts names in locale order', () => {
     const files = [
       { id: 1, filename: 'docs/zeta.txt', size: 1, mimeType: 'text/plain' },

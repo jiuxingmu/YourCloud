@@ -121,6 +121,12 @@ class SdkClientImpl implements SdkClient {
     const shouldDedupe = method === 'GET'
     const dedupeKey = shouldDedupe ? createRequestKey(path, init) : ''
 
+    // Any write may change resources fetched by pending GET requests.
+    // Clear in-flight GET map so subsequent reads don't reuse stale promises.
+    if (!shouldDedupe && this.inflightGetRequests.size > 0) {
+      this.inflightGetRequests.clear()
+    }
+
     if (shouldDedupe) {
       const pending = this.inflightGetRequests.get(dedupeKey)
       if (pending) return pending as Promise<T>

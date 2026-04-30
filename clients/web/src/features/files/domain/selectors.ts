@@ -58,14 +58,29 @@ export function deriveDriveItems(files: FileItem[], currentPath: string): FileIt
       } satisfies FileItem
     })
 
-  const merged = [...syntheticFolders, ...directFiles]
-  const uniqueByPath = new Map<string, FileItem>()
-  for (const item of merged) {
-    const key = normalizePath(item.filename)
-    if (!uniqueByPath.has(key)) uniqueByPath.set(key, item)
+  const uniqueFoldersByPath = new Map<string, FileItem>()
+  const getTimestamp = (item: FileItem): number => {
+    const raw = item.updatedAt ?? item.createdAt
+    if (!raw) return 0
+    const time = Date.parse(raw)
+    return Number.isNaN(time) ? 0 : time
   }
+  for (const item of [...syntheticFolders, ...directFiles.filter((f) => f.mimeType === 'inode/directory')]) {
+    const key = normalizePath(item.filename)
+    const existing = uniqueFoldersByPath.get(key)
+    if (!existing) {
+      uniqueFoldersByPath.set(key, item)
+      continue
+    }
+    const existingTime = getTimestamp(existing)
+    const incomingTime = getTimestamp(item)
+    if (incomingTime > existingTime || (incomingTime === existingTime && item.id > existing.id)) {
+      uniqueFoldersByPath.set(key, item)
+    }
+  }
+  const merged = [...Array.from(uniqueFoldersByPath.values()), ...directFiles.filter((f) => f.mimeType !== 'inode/directory')]
 
-  return Array.from(uniqueByPath.values()).sort((a, b) => {
+  return merged.sort((a, b) => {
     const aFolder = a.mimeType === 'inode/directory'
     const bFolder = b.mimeType === 'inode/directory'
     if (aFolder !== bFolder) return aFolder ? -1 : 1

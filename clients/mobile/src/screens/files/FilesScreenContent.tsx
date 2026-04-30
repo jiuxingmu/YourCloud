@@ -1,11 +1,11 @@
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActionSheetIOS, Alert, FlatList, Linking, Platform, RefreshControl, Share, Text, View } from 'react-native';
 import { MotiPressable } from 'moti/interactions';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { isDirectoryItem, type FileItem } from '@yourcloud/sdk';
+import { getBaseName, isDirectoryItem, type FileItem } from '@yourcloud/sdk';
 import { useSdkClient } from '../../context/SdkClientContext';
 import type { RootStackParamList } from '../../navigation/types';
 import { AppTheme } from '../../ui/theme';
@@ -34,6 +34,7 @@ export function FilesScreen() {
   const [shareExtractCode, setShareExtractCode] = useState('');
   const [creatingShare, setCreatingShare] = useState(false);
   const [pathStack, setPathStack] = useState<string[]>(['/']);
+  const latestLoadRequestRef = useRef(0);
 
   const currentPath = pathStack[pathStack.length - 1] || '/';
   const pathLabel = useMemo(() => (currentPath === '/' ? '根目录 /' : currentPath), [currentPath]);
@@ -41,8 +42,12 @@ export function FilesScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadFiles(currentPath);
-    }, []),
+    }, [currentPath]),
   );
+
+  useEffect(() => {
+    void loadFiles(currentPath);
+  }, [currentPath]);
 
   function sortFileItems(items: FileItem[]): FileItem[] {
     return [...items].sort((a, b) => {
@@ -61,14 +66,18 @@ export function FilesScreen() {
   }
 
   async function loadFiles(path = '/') {
+    const requestId = ++latestLoadRequestRef.current;
     setLoading(true);
     try {
       const data = await client.filesList(path === '/' ? '' : path);
+      if (requestId !== latestLoadRequestRef.current) return;
       setFiles(sortFileItems(data));
       setStatus('');
     } catch (error) {
+      if (requestId !== latestLoadRequestRef.current) return;
       setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
     } finally {
+      if (requestId !== latestLoadRequestRef.current) return;
       setLoading(false);
     }
   }
@@ -117,9 +126,9 @@ export function FilesScreen() {
 
   function openFileOrFolder(item: FileItem) {
     if (isDirectoryItem(item.filename, item.mimeType)) {
-      const nextPath = currentPath === '/' ? item.filename : `${currentPath}/${item.filename}`;
+      const folderName = getBaseName(item.filename) || item.filename;
+      const nextPath = currentPath === '/' ? folderName : `${currentPath}/${folderName}`;
       setPathStack((prev) => [...prev, nextPath]);
-      void loadFiles(nextPath);
       return;
     }
     const parent = navigation.getParent();
@@ -225,7 +234,6 @@ export function FilesScreen() {
           if (pathStack.length <= 1) return;
           const nextStack = pathStack.slice(0, -1);
           setPathStack(nextStack);
-          void loadFiles(nextStack[nextStack.length - 1] || '/');
         }}
       />
 
