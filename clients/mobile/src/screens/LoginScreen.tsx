@@ -70,7 +70,7 @@ export function LoginScreen({ onLoggedIn, onGoRegister }: Props) {
         <Feather name="mail" size={18} color="#6B7280" style={styles.leftIcon} />
         <TextInput
           value={email}
-          onChangeText={(text) => setEmail(normalizeEmailInput(text))}
+          onChangeText={(text) => setEmail(text)}
           style={styles.input}
           autoCapitalize="none"
           autoCorrect={false}
@@ -104,8 +104,8 @@ export function LoginScreen({ onLoggedIn, onGoRegister }: Props) {
         </Pressable>
       </View>
 
-      <Pressable style={({ pressed }) => [styles.button, submitting && styles.buttonDisabled, pressed && styles.buttonPressed]} disabled={submitting} onPress={submit}>
-        <Text style={styles.buttonText}>{submitting ? '处理中...' : '登录'}</Text>
+      <Pressable style={[styles.button, submitting ? styles.buttonDisabled : styles.buttonEnabled]} disabled={submitting} onPress={submit}>
+        <Text style={[styles.buttonText, submitting && styles.buttonTextDisabled]}>{submitting ? '处理中...' : '登录'}</Text>
       </Pressable>
 
       <Pressable>
@@ -186,22 +186,27 @@ const styles = StyleSheet.create({
     color: AppTheme.colors.textSecondary,
   },
   button: {
-    backgroundColor: AppTheme.colors.primary,
     borderRadius: AppTheme.radius.md,
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    minHeight: 50,
+    marginTop: 4,
   },
-  buttonPressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.985 }],
+  buttonEnabled: {
+    backgroundColor: AppTheme.colors.primary,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    backgroundColor: '#CBD5E1',
   },
   buttonText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 15,
+  },
+  buttonTextDisabled: {
+    color: '#F8FAFC',
   },
   linkText: {
     color: AppTheme.colors.primary,

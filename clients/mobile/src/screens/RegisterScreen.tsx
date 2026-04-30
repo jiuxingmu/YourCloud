@@ -98,8 +98,8 @@ export function RegisterScreen({ onLoggedIn, onGoLogin }: Props) {
         </Pressable>
       </View>
 
-      <Pressable style={({ pressed }) => [styles.button, submitting && styles.buttonDisabled, pressed && styles.buttonPressed]} disabled={submitting} onPress={submit}>
-        <Text style={styles.buttonText}>{submitting ? '处理中...' : '创建账户'}</Text>
+      <Pressable style={[styles.button, submitting ? styles.buttonDisabled : styles.buttonEnabled]} disabled={submitting} onPress={submit}>
+        <Text style={[styles.buttonText, submitting && styles.buttonTextDisabled]}>{submitting ? '处理中...' : '创建账户'}</Text>
       </Pressable>
 
       <Pressable onPress={onGoLogin}>
@@ -162,22 +162,27 @@ const styles = StyleSheet.create({
     top: 11,
   },
   button: {
-    backgroundColor: AppTheme.colors.primary,
     borderRadius: AppTheme.radius.md,
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    minHeight: 50,
+    marginTop: 4,
   },
-  buttonPressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.985 }],
+  buttonEnabled: {
+    backgroundColor: AppTheme.colors.primary,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    backgroundColor: '#CBD5E1',
   },
   buttonText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 15,
+  },
+  buttonTextDisabled: {
+    color: '#F8FAFC',
   },
   secondaryLink: {
     marginTop: 16,
