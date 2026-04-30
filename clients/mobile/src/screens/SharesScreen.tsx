@@ -1,26 +1,27 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ManagedShareItem } from '@yourcloud/sdk';
 import { useSdkClient } from '../context/SdkClientContext';
-import { AppTheme } from '../ui/theme';
+import type { RootStackParamList } from '../navigation/types';
 
 export function SharesScreen() {
   const client = useSdkClient();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [items, setItems] = useState<ManagedShareItem[]>([]);
-  const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
-  const [revokingId, setRevokingId] = useState<number | null>(null);
+  const [status, setStatus] = useState('');
 
   const loadShares = useCallback(async () => {
     setLoading(true);
-    setStatus('加载中...');
     try {
       const data = await client.shares.listMine();
       setItems(data);
-      setStatus(`共 ${data.length} 条分享`);
-    } catch (e) {
-      setStatus(client.toUserFriendlyErrorMessage(e, 'files'));
+      setStatus('');
+    } catch (error) {
+      setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
     } finally {
       setLoading(false);
     }
@@ -32,54 +33,80 @@ export function SharesScreen() {
     }, [loadShares]),
   );
 
-  async function revoke(shareId: number) {
-    setRevokingId(shareId);
-    try {
-      await client.shares.revoke(shareId);
-      await loadShares();
-    } catch (e) {
-      setStatus(client.toUserFriendlyErrorMessage(e, 'files'));
-    } finally {
-      setRevokingId(null);
-    }
+  function shortToken(token: string): string {
+    if (token.length <= 18) return token;
+    return `${token.slice(0, 8)}...${token.slice(-6)}`;
+  }
+
+  function askRevoke(item: ManagedShareItem) {
+    Alert.alert('撤销分享', `确定撤销 "${item.filename}" 的分享链接吗？`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '撤销',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await client.shares.revoke(item.share.id);
+            await loadShares();
+          } catch (error) {
+            setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
+          }
+        },
+      },
+    ]);
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>我的分享</Text>
-      <Text style={styles.subtitle}>管理你分享出去的链接</Text>
-      <Pressable style={[styles.refresh, loading && styles.disabled]} onPress={loadShares} disabled={loading}>
-        <Text style={styles.refreshText}>{loading ? '刷新中...' : '刷新'}</Text>
-      </Pressable>
-      <Text style={styles.status}>{status}</Text>
+      <View style={styles.topRow}>
+        <Text style={styles.title}>分享</Text>
+        <View style={styles.topActions}>
+          <Pressable style={styles.accessBtn} onPress={() => navigation.navigate('ShareAccess')}>
+            <Ionicons name="enter-outline" size={17} color="#2463EB" />
+            <Text style={styles.accessBtnText}>访问</Text>
+          </Pressable>
+          <Pressable style={styles.refreshBtn} onPress={loadShares} disabled={loading}>
+            <Ionicons name="refresh" size={18} color="#fff" />
+          </Pressable>
+        </View>
+      </View>
+
+      {!!status && <Text style={styles.status}>{status}</Text>}
+      <Text style={styles.count}>{items.length} 条分享</Text>
+
       <FlatList
         data={items}
         keyExtractor={(item) => String(item.share.id)}
+        contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={({ item }) => {
           const revoked = Boolean(item.share.revokedAt);
           return (
-            <View style={styles.row}>
-              <View style={styles.rowMain}>
-                <Text style={styles.filename}>{item.filename}</Text>
-                <Text style={styles.meta} numberOfLines={1}>
-                  token: {item.share.token}
+            <View style={styles.card}>
+              <View style={styles.left}>
+                <Text style={styles.filename} numberOfLines={1}>
+                  {item.filename}
                 </Text>
+                <Text style={styles.meta}>token: {shortToken(item.share.token)}</Text>
                 {item.share.expiresAt ? <Text style={styles.meta}>过期: {item.share.expiresAt}</Text> : null}
-                {revoked ? <Text style={styles.revoked}>已撤销</Text> : null}
               </View>
-              {!revoked ? (
-                <Pressable
-                  style={[styles.revokeBtn, revokingId === item.share.id && styles.disabled]}
-                  onPress={() => revoke(item.share.id)}
-                  disabled={revokingId === item.share.id}
-                >
-                  <Text style={styles.revokeText}>{revokingId === item.share.id ? '撤销中' : '撤销'}</Text>
-                </Pressable>
-              ) : null}
+              <Pressable
+                style={[styles.actionBtn, revoked && styles.actionBtnDisabled]}
+                onPress={() => askRevoke(item)}
+                disabled={revoked}
+              >
+                <Text style={[styles.actionText, revoked && styles.actionTextDisabled]}>{revoked ? '已撤销' : '撤销'}</Text>
+              </Pressable>
             </View>
           );
         }}
-        ListEmptyComponent={!loading ? <Text style={styles.empty}>暂无分享</Text> : null}
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.empty}>
+              <Ionicons name="share-social-outline" size={24} color="#9AA5B5" />
+              <Text style={styles.emptyText}>还没有分享记录</Text>
+            </View>
+          ) : null
+        }
       />
     </View>
   );
@@ -88,85 +115,107 @@ export function SharesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: AppTheme.colors.bg,
+    backgroundColor: '#F8F9FA',
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 14,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: AppTheme.colors.text,
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  subtitle: {
-    color: AppTheme.colors.textSecondary,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  refresh: {
-    alignSelf: 'flex-start',
-    backgroundColor: AppTheme.colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: AppTheme.radius.md,
-    marginBottom: 8,
-  },
-  refreshText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  disabled: {
-    opacity: 0.55,
-  },
-  status: {
-    fontSize: 14,
-    color: AppTheme.colors.textSecondary,
-    marginBottom: 8,
-  },
-  row: {
+  topActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: AppTheme.colors.border,
-    borderRadius: AppTheme.radius.lg,
-    backgroundColor: AppTheme.colors.card,
-    paddingHorizontal: 12,
     gap: 8,
   },
-  rowMain: {
+  accessBtn: {
+    height: 34,
+    borderRadius: 17,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#CFE0FF',
+    backgroundColor: '#EEF4FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  accessBtnText: {
+    color: '#2463EB',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  title: {
+    fontSize: 38,
+    fontWeight: '800',
+    color: '#0B1324',
+  },
+  refreshBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#2463EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  status: {
+    marginTop: 8,
+    color: '#66748A',
+  },
+  count: {
+    marginTop: 6,
+    marginBottom: 8,
+    color: '#8A95A6',
+  },
+  card: {
+    marginBottom: 10,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E9EDF2',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  left: {
     flex: 1,
   },
   filename: {
     fontSize: 16,
-    fontWeight: '600',
-    color: AppTheme.colors.text,
+    fontWeight: '700',
+    color: '#111827',
   },
   meta: {
-    fontSize: 12,
-    color: AppTheme.colors.textSecondary,
-    marginTop: 4,
-  },
-  revoked: {
-    marginTop: 4,
-    color: '#656d76',
+    marginTop: 3,
+    color: '#999999',
     fontSize: 12,
   },
-  revokeBtn: {
+  actionBtn: {
     borderWidth: 1,
-    borderColor: AppTheme.colors.danger,
-    borderRadius: AppTheme.radius.sm,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FFF1F2',
+    borderRadius: 12,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
-  revokeText: {
-    color: AppTheme.colors.danger,
-    fontWeight: '600',
-    fontSize: 12,
+  actionBtnDisabled: {
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+  },
+  actionText: {
+    color: '#E11D48',
+    fontWeight: '700',
+  },
+  actionTextDisabled: {
+    color: '#94A3B8',
   },
   empty: {
-    marginTop: 24,
-    textAlign: 'center',
-    color: '#888',
+    marginTop: 50,
+    alignItems: 'center',
+  },
+  emptyText: {
+    marginTop: 8,
+    color: '#9AA5B5',
   },
 });

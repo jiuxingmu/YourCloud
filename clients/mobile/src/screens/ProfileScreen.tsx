@@ -1,9 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuthenticatedSession } from '../context/AuthenticatedSessionContext';
 import { useSdkClient } from '../context/SdkClientContext';
-import { AppTheme } from '../ui/theme';
 
 type Me = { id: number; email: string };
 
@@ -11,16 +11,16 @@ export function ProfileScreen() {
   const client = useSdkClient();
   const { onLogout, initialApiBaseUrl, onApiBaseUrlChange } = useAuthenticatedSession();
   const [me, setMe] = useState<Me | null>(null);
-  const [status, setStatus] = useState('');
   const [apiBaseUrl, setApiBaseUrl] = useState(initialApiBaseUrl);
+  const [status, setStatus] = useState('');
 
   const loadMe = useCallback(async () => {
     try {
       const data = await client.auth.me<Me>();
       setMe(data);
       setStatus('');
-    } catch (e) {
-      setStatus(client.toUserFriendlyErrorMessage(e, 'auth'));
+    } catch (error) {
+      setStatus(client.toUserFriendlyErrorMessage(error, 'auth'));
     }
   }, [client]);
 
@@ -30,46 +30,65 @@ export function ProfileScreen() {
     }, [loadMe]),
   );
 
-  async function applyApiBaseUrl() {
+  async function saveApiBaseUrl() {
     await onApiBaseUrlChange(apiBaseUrl.trim() || 'http://10.0.2.2:8080');
-    setStatus('API 地址已保存');
+    setStatus('连接地址已保存');
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>我的</Text>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+      <View style={styles.header}>
+        <View style={styles.avatar}>
+          <Ionicons name="person-outline" size={36} color="#fff" />
+        </View>
+        <Text style={styles.name}>YourCloud 用户</Text>
+        <Text style={styles.email}>{me?.email ?? '-'}</Text>
+      </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>账号信息</Text>
-        <Text style={styles.kv}>用户 ID：{me?.id ?? '-'}</Text>
-        <Text style={styles.kv}>邮箱：{me?.email ?? '-'}</Text>
+        <Text style={styles.cardTitle}>云盘功能</Text>
+        <View style={styles.grid}>
+          {[
+            ['star-outline', '收藏'],
+            ['share-social-outline', '分享'],
+            ['trash-outline', '回收站'],
+            ['download-outline', '已下载'],
+          ].map(([icon, label]) => (
+            <Pressable key={label} style={styles.gridItem}>
+              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={22} color="#3D73F5" />
+              <Text style={styles.gridText}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>连接配置</Text>
         <TextInput value={apiBaseUrl} onChangeText={setApiBaseUrl} style={styles.input} autoCapitalize="none" />
-        <Pressable style={styles.primaryBtn} onPress={applyApiBaseUrl}>
+        <Pressable style={styles.primaryBtn} onPress={saveApiBaseUrl}>
           <Text style={styles.primaryBtnText}>保存 API 地址</Text>
         </Pressable>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>功能入口</Text>
-        <Pressable style={styles.entry}>
-          <Text style={styles.entryText}>收藏（即将支持）</Text>
-        </Pressable>
-        <Pressable style={styles.entry}>
-          <Text style={styles.entryText}>回收站（即将支持）</Text>
-        </Pressable>
-        <Pressable style={styles.entry}>
-          <Text style={styles.entryText}>设置（即将支持）</Text>
-        </Pressable>
+        <View style={styles.rowItem}>
+          <Ionicons name="moon-outline" size={20} color="#64748B" />
+          <Text style={styles.rowText}>夜间模式（即将支持）</Text>
+        </View>
+        <View style={styles.rowItem}>
+          <Ionicons name="settings-outline" size={20} color="#64748B" />
+          <Text style={styles.rowText}>设置</Text>
+        </View>
+        <View style={styles.rowItem}>
+          <Ionicons name="chatbox-ellipses-outline" size={20} color="#64748B" />
+          <Text style={styles.rowText}>反馈</Text>
+        </View>
       </View>
 
       {!!status && <Text style={styles.status}>{status}</Text>}
 
-      <Pressable style={styles.dangerBtn} onPress={onLogout}>
-        <Text style={styles.dangerBtnText}>退出登录</Text>
+      <Pressable style={styles.logout} onPress={onLogout}>
+        <Text style={styles.logoutText}>退出登录</Text>
       </Pressable>
     </ScrollView>
   );
@@ -78,77 +97,109 @@ export function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: AppTheme.colors.bg,
+    backgroundColor: '#F8F9FA',
   },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 28,
+  header: {
+    paddingTop: 24,
+    paddingBottom: 20,
+    alignItems: 'center',
+    backgroundColor: '#DDEAFF',
   },
-  title: {
-    fontSize: 26,
+  avatar: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#4C7BF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  name: {
+    marginTop: 10,
+    fontSize: 24,
     fontWeight: '700',
-    color: AppTheme.colors.text,
-    marginBottom: 12,
+    color: '#111827',
+  },
+  email: {
+    marginTop: 4,
+    color: '#526074',
   },
   card: {
-    backgroundColor: AppTheme.colors.card,
-    borderRadius: AppTheme.radius.lg,
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#fff',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: AppTheme.colors.border,
+    borderColor: '#E9EDF2',
     padding: 14,
-    marginBottom: 12,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    color: AppTheme.colors.text,
+    color: '#111827',
     marginBottom: 10,
   },
-  kv: {
-    color: AppTheme.colors.textSecondary,
-    marginBottom: 6,
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 14,
+  },
+  gridItem: {
+    width: '25%',
+    alignItems: 'center',
+    gap: 6,
+  },
+  gridText: {
+    fontSize: 13,
+    color: '#334155',
   },
   input: {
     borderWidth: 1,
-    borderColor: AppTheme.colors.border,
-    borderRadius: AppTheme.radius.md,
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
     paddingVertical: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    backgroundColor: '#fff',
     marginBottom: 10,
   },
   primaryBtn: {
-    backgroundColor: AppTheme.colors.primary,
-    borderRadius: AppTheme.radius.md,
+    backgroundColor: '#2463EB',
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: 'center',
-    paddingVertical: 11,
   },
-  primaryBtnText: { color: '#fff', fontWeight: '700' },
-  entry: {
-    backgroundColor: AppTheme.colors.cardSoft,
-    borderRadius: AppTheme.radius.md,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: AppTheme.colors.border,
-    marginBottom: 8,
+  primaryBtnText: {
+    color: '#fff',
+    fontWeight: '700',
   },
-  entryText: { color: AppTheme.colors.textSecondary },
+  rowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  rowText: {
+    fontSize: 15,
+    color: '#334155',
+  },
   status: {
-    color: AppTheme.colors.success,
-    marginBottom: 10,
+    marginHorizontal: 16,
+    marginTop: 10,
+    color: '#16A34A',
   },
-  dangerBtn: {
-    backgroundColor: '#FEE2E2',
+  logout: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 20,
+    backgroundColor: '#FFF1F2',
+    borderColor: '#FECACA',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: AppTheme.radius.md,
+    borderRadius: 12,
     alignItems: 'center',
     paddingVertical: 12,
   },
-  dangerBtnText: {
-    color: AppTheme.colors.danger,
+  logoutText: {
+    color: '#E11D48',
     fontWeight: '700',
   },
 });

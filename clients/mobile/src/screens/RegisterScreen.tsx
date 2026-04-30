@@ -1,8 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSdkClient } from '../context/SdkClientContext';
 import { AppTheme } from '../ui/theme';
+import { ToastMessage } from '../ui/ToastMessage';
 
 type Props = {
   onLoggedIn: (token: string) => Promise<void>;
@@ -15,7 +16,7 @@ export function RegisterScreen({ onLoggedIn, onGoLogin }: Props) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
   function normalizeEmailInput(input: string): string {
     return input.replace(/[。．]/g, '.').replace(/＠/g, '@').replace(/\s/g, '');
@@ -25,15 +26,15 @@ export function RegisterScreen({ onLoggedIn, onGoLogin }: Props) {
     const normalizedEmail = email.trim().toLowerCase();
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!normalizedEmail || !password) {
-      Alert.alert('提示', '请输入邮箱和密码');
+      setStatus({ type: 'error', message: '请输入邮箱和密码' });
       return false;
     }
     if (!emailPattern.test(normalizedEmail)) {
-      Alert.alert('提示', '请输入有效的邮箱地址');
+      setStatus({ type: 'error', message: '请输入有效的邮箱地址' });
       return false;
     }
     if (password.length < 6) {
-      Alert.alert('提示', '注册密码至少需要 6 位');
+      setStatus({ type: 'error', message: '注册密码至少需要 6 位' });
       return false;
     }
     return true;
@@ -42,19 +43,19 @@ export function RegisterScreen({ onLoggedIn, onGoLogin }: Props) {
   async function submit() {
     if (!validate()) return;
     setSubmitting(true);
-    setStatus('注册中...');
+    setStatus({ type: 'info', message: '注册中...' });
     try {
       const normalizedEmail = email.trim().toLowerCase();
       await client.auth.register(normalizedEmail, password);
       const loginData = await client.auth.login(normalizedEmail, password);
       if (!loginData.token) {
-        setStatus('注册成功，请返回登录');
+        setStatus({ type: 'success', message: '注册成功，请返回登录' });
         return;
       }
       await onLoggedIn(loginData.token);
-      setStatus('注册并登录成功');
+      setStatus({ type: 'success', message: '注册并登录成功' });
     } catch (e) {
-      setStatus(client.toUserFriendlyErrorMessage(e, 'auth'));
+      setStatus({ type: 'error', message: client.toUserFriendlyErrorMessage(e, 'auth') });
     } finally {
       setSubmitting(false);
     }
@@ -105,7 +106,7 @@ export function RegisterScreen({ onLoggedIn, onGoLogin }: Props) {
         <Text style={styles.secondaryLink}>已有账号？返回登录</Text>
       </Pressable>
 
-      {!!status && <Text style={styles.status}>{status}</Text>}
+      {!!status && <ToastMessage type={status.type} message={status.message} onHidden={() => setStatus(null)} />}
     </View>
   );
 }
@@ -182,10 +183,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: 'center',
     color: AppTheme.colors.textSecondary,
-  },
-  status: {
-    marginTop: 14,
-    fontSize: 14,
-    color: '#64748B',
   },
 });
