@@ -1,4 +1,14 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+function resolveApiBaseUrl(): string {
+  const configured = (import.meta.env.VITE_API_BASE_URL || '').trim()
+  if (import.meta.env.DEV) {
+    if (!configured || configured === '/cloud' || configured.startsWith('/cloud/')) {
+      return 'http://localhost:8080'
+    }
+  }
+  return configured || 'http://localhost:8080'
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 
 type ApiErr = { error?: { code?: string; message?: string } }
 type RequestContext = 'auth' | 'files' | 'generic'
@@ -15,6 +25,10 @@ export class ApiRequestError extends Error {
     this.code = options?.code
     this.isNetworkError = Boolean(options?.isNetworkError)
   }
+}
+
+export function getApiBaseUrl(): string {
+  return API_BASE_URL
 }
 
 const inflightGetRequests = new Map<string, Promise<unknown>>()

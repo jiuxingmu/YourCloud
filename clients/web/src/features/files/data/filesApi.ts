@@ -1,7 +1,7 @@
-import { authHeaders, request } from '../../../apiClient'
+import { authHeaders, getApiBaseUrl as getClientApiBaseUrl, request } from '../../../apiClient'
 import type { FileItem } from '../domain'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const API_BASE_URL = getClientApiBaseUrl()
 
 export function getApiBaseUrl(): string {
   return API_BASE_URL

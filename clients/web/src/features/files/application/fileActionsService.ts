@@ -117,7 +117,8 @@ export async function downloadFileService(
   }
 
   try {
-    const res = await deps.fetchImpl(buildFileDownloadUrl(file.id), { headers: { ...authHeaders() } })
+    const requestUrl = buildFileDownloadUrl(file.id)
+    const res = await deps.fetchImpl.call(globalThis, requestUrl, { headers: { ...authHeaders() } })
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } }
       throw new ApiRequestError(body.error?.message || `下载失败(${res.status})`, {
@@ -126,14 +127,14 @@ export async function downloadFileService(
       })
     }
     const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
+    const blobUrl = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
-    anchor.href = url
+    anchor.href = blobUrl
     anchor.download = file.filename
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
     showFeedback('success', '已开始下载。')
   } catch (error) {
     showFeedback('error', toErrorMessage(error))
