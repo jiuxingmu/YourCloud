@@ -153,6 +153,10 @@ export function FilesScreen() {
     return [...Array.from(uniqueFoldersByPath.values()), ...directFiles.filter((f) => f.mimeType !== 'inode/directory')];
   }
 
+  function buildPathItems(path: string, data: FileItem[]): FileItem[] {
+    return sortFileItems(deriveCurrentPathItems(data, path));
+  }
+
   async function loadFiles(path = '/', options?: { force?: boolean }) {
     const cacheKey = normalizePath(path);
     if (!options?.force) {
@@ -167,7 +171,7 @@ export function FilesScreen() {
     try {
       const data = await client.filesList(path === '/' ? '' : path);
       if (requestId !== latestLoadRequestRef.current) return;
-      const nextFiles = sortFileItems(deriveCurrentPathItems(data, path));
+      const nextFiles = buildPathItems(path, data);
       memoryCacheRef.current.set(cacheKey, nextFiles);
       setFiles(nextFiles);
       setStatus('');
@@ -222,11 +226,27 @@ export function FilesScreen() {
     }
   }
 
-  function openFileOrFolder(item: FileItem) {
+  async function openFileOrFolder(item: FileItem) {
     if (isDirectoryItem(item.filename, item.mimeType)) {
       const folderName = getBaseName(item.filename) || item.filename;
       const nextPath = currentPath === '/' ? folderName : `${currentPath}/${folderName}`;
-      setPathStack((prev) => [...prev, nextPath]);
+      const cacheKey = normalizePath(nextPath);
+      const cached = memoryCacheRef.current.get(cacheKey);
+      if (cached) {
+        setPathStack((prev) => [...prev, nextPath]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const data = await client.filesList(nextPath === '/' ? '' : nextPath);
+        memoryCacheRef.current.set(cacheKey, buildPathItems(nextPath, data));
+        setPathStack((prev) => [...prev, nextPath]);
+        setStatus('');
+      } catch (error) {
+        setStatus(client.toUserFriendlyErrorMessage(error, 'files'));
+      } finally {
+        setLoading(false);
+      }
       return;
     }
     const parent = navigation.getParent();

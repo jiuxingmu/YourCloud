@@ -26,7 +26,7 @@ import {
 } from '@mui/material'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import ArrowDropDownRoundedIcon from '@mui/icons-material/ArrowDropDownRounded'
-import { authHeaders, request } from './apiClient'
+import { authHeaders, request, YOURCLOUD_SESSION_EXPIRED_EVENT } from './apiClient'
 import { formatBytes } from '@yourcloud/sdk'
 import { emitStarredCleared, emitTrashCleared, onFilesChanged } from './features/files/data/filesEvents'
 import { clearDeletedItems, clearSearchHistory, clearStarredIds, readSearchHistory, writeSearchHistory } from './features/files/data/filesStorage'
@@ -119,7 +119,7 @@ export default function App() {
   const [settingsAnchor, setSettingsAnchor] = useState<null | HTMLElement>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [usedBytes, setUsedBytes] = useState(0)
-  const totalBytes = 15 * 1024 * 1024 * 1024
+  const totalBytes = 2 * 1024 * 1024 * 1024 * 1024
   const shouldRenderSharePage = shareRoute || !!shareToken
   const shouldRenderShell = shouldRenderSharePage || loggedIn
 
@@ -127,6 +127,15 @@ export default function App() {
     localStorage.removeItem('token')
     setLoggedIn(false)
   }
+
+  useEffect(() => {
+    function onSessionExpired() {
+      setLoggedIn(false)
+      setCurrentUser(null)
+    }
+    window.addEventListener(YOURCLOUD_SESSION_EXPIRED_EVENT, onSessionExpired)
+    return () => window.removeEventListener(YOURCLOUD_SESSION_EXPIRED_EVENT, onSessionExpired)
+  }, [])
 
   function showFeedback(type: 'success' | 'error', text: string) {
     setFeedback({ type, text })
@@ -350,7 +359,7 @@ export default function App() {
                   </Typography>
                   <LinearProgress variant="determinate" value={Math.max(1, Math.min(100, (usedBytes / totalBytes) * 100))} sx={{ mt: 1, mb: 0.8, height: 6, borderRadius: 0 }} />
                   <Typography variant="caption" color="text.secondary">
-                    已用 {formatBytes(usedBytes)}，共 15 GB
+                    已用 {formatBytes(usedBytes)}，共 {formatBytes(totalBytes)}
                   </Typography>
                 </Box>
               </Box>
@@ -429,7 +438,7 @@ export default function App() {
                   </Typography>
                   <LinearProgress variant="determinate" value={Math.max(1, Math.min(100, (usedBytes / totalBytes) * 100))} sx={{ height: 5, borderRadius: 0 }} />
                   <Typography variant="caption" color="text.secondary">
-                    已用 {formatBytes(usedBytes)} / 15 GB
+                    已用 {formatBytes(usedBytes)} / {formatBytes(totalBytes)}
                   </Typography>
                 </Box>
               </MenuItem>

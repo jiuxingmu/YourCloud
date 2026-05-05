@@ -75,6 +75,15 @@ class SdkClientImpl implements SdkClient {
     this.fileDownloader = options.fileDownloader
   }
 
+  private clearSessionIfUnauthorized(path: string, init: RequestInit | undefined, status: number): void {
+    if (status !== 401) return
+    const method = (init?.method ?? 'GET').toUpperCase()
+    if (method === 'POST' && (path.startsWith('/api/v1/auth/login') || path.startsWith('/api/v1/auth/register'))) {
+      return
+    }
+    this.tokenStore?.clearToken?.()
+  }
+
   private async requestRaw(path: string, init?: RequestInit): Promise<Response> {
     let res: Response
     try {
@@ -90,6 +99,7 @@ class SdkClientImpl implements SdkClient {
 
     if (!res.ok) {
       const body = await parseApiError(res)
+      this.clearSessionIfUnauthorized(path, init, res.status)
       throw new ApiRequestError(body.error?.message || `Request failed: ${res.status}`, {
         status: res.status,
         code: body.error?.code,
@@ -245,6 +255,9 @@ class SdkClientImpl implements SdkClient {
         }
 
         if (xhr.status < 200 || xhr.status >= 300) {
+          if (xhr.status === 401) {
+            this.clearSessionIfUnauthorized('/api/v1/files', { method: 'POST' }, 401)
+          }
           const err = body as ApiErr
           reject(
             new ApiRequestError(err.error?.message || `Request failed: ${xhr.status}`, {

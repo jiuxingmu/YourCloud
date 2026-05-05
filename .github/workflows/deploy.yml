@@ -115,7 +115,7 @@ jobs:
               -e JWT_SECRET="$JWT_SECRET" \
               -e STORAGE_PROVIDER=local \
               -e STORAGE_PATH=/app/uploads \
-              -e JWT_TTL_MIN=1440 \
+              -e JWT_TTL_MIN=10080 \
               -v yourcloud_uploads:/app/uploads \
               "$API_IMAGE"
 

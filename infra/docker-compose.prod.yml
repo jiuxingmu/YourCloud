@@ -25,7 +25,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       STORAGE_PROVIDER: local
       STORAGE_PATH: /app/uploads
-      JWT_TTL_MIN: ${JWT_TTL_MIN:-1440}
+      JWT_TTL_MIN: ${JWT_TTL_MIN:-10080}
     volumes:
       - uploads:/app/uploads
     ports:

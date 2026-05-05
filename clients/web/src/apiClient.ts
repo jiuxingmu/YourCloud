@@ -11,10 +11,18 @@ function resolveApiBaseUrl(): string {
 }
 
 const API_BASE_URL = resolveApiBaseUrl()
+
+/** Dispatched on the window after the SDK clears an invalid or expired session token. */
+export const YOURCLOUD_SESSION_EXPIRED_EVENT = 'yourcloud:session-expired'
+
 export const sdkClient = createSdkClient({
   apiBaseUrl: API_BASE_URL,
   tokenStore: {
     getToken: () => localStorage.getItem('token'),
+    clearToken: () => {
+      localStorage.removeItem('token')
+      window.dispatchEvent(new CustomEvent(YOURCLOUD_SESSION_EXPIRED_EVENT))
+    },
   },
 })
 

@@ -20,7 +20,8 @@ type Config struct {
 
 func Load() Config {
 	_ = godotenv.Load()
-	ttl, _ := strconv.Atoi(getEnv("JWT_TTL_MIN", "1440"))
+	// Default 7 days (10080 minutes). Override with JWT_TTL_MIN.
+	ttl, _ := strconv.Atoi(getEnv("JWT_TTL_MIN", "10080"))
 	return Config{
 		Port:        getEnv("PORT", "8080"),
 		DBURL:       getEnv("DB_URL", "postgres://yourcloud:yourcloud@localhost:5432/yourcloud?sslmode=disable"),

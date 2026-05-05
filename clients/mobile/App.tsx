@@ -11,7 +11,7 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RegisterScreen } from './src/screens/RegisterScreen';
 import { loadApiBaseUrl, saveApiBaseUrl } from './src/storage/appConfigStorage';
-import { clearToken, loadToken, saveToken } from './src/storage/tokenStorage';
+import { clearToken as clearPersistedToken, loadToken, saveToken } from './src/storage/tokenStorage';
 
 export default function App() {
   const [apiBaseUrl, setApiBaseUrl] = useState('http://10.0.2.2:8080');
@@ -27,6 +27,12 @@ export default function App() {
       apiBaseUrl: apiBaseUrl.trim() || 'http://10.0.2.2:8080',
       tokenStore: {
         getToken: () => token || null,
+        clearToken: () => {
+          void (async () => {
+            await clearPersistedToken();
+            setToken('');
+          })();
+        },
       },
       fileDownloader: async (url, destination, options) => {
         return await FileSystem.downloadAsync(url, destination, { headers: options?.headers ?? {} });
@@ -103,7 +109,7 @@ export default function App() {
   }
 
   async function handleLogout() {
-    await clearToken();
+    await clearPersistedToken();
     setToken('');
   }
 

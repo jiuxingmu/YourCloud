@@ -25,7 +25,9 @@ export function formatBytes(bytes: number): string {
   const mb = kb / 1024
   if (mb < 1024) return `${mb.toFixed(1)} MB`
   const gb = mb / 1024
-  return `${gb.toFixed(2)} GB`
+  if (gb < 1024) return `${gb.toFixed(2)} GB`
+  const tb = gb / 1024
+  return `${Number(tb.toFixed(2))} TB`
 }
 
 export function extensionOfFilename(filename: string): string {

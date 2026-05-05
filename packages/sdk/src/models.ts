@@ -2,6 +2,8 @@ export type RequestContext = 'auth' | 'files' | 'generic'
 
 export type TokenStore = {
   getToken: () => string | null
+  /** Called when the server rejects the session (e.g. expired JWT). Host should clear persisted credentials. */
+  clearToken?: () => void
 }
 
 export type SdkClientOptions = {
