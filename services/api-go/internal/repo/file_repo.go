@@ -18,6 +18,15 @@ func (r FileRepo) ListByOwner(ownerID uint) ([]model.File, error) {
 	return files, err
 }
 
+func (r FileRepo) SumSizeByOwner(ownerID uint) (int64, error) {
+	var sum int64
+	err := r.DB.Model(&model.File{}).
+		Where("owner_id = ?", ownerID).
+		Select("COALESCE(SUM(size), 0)").
+		Scan(&sum).Error
+	return sum, err
+}
+
 func (r FileRepo) FindByID(id uint) (*model.File, error) {
 	var f model.File
 	if err := r.DB.First(&f, id).Error; err != nil {

@@ -2,11 +2,14 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
 	"yourcloud/backend-go/internal/model"
+	"yourcloud/backend-go/internal/pkg/apperror"
 	"yourcloud/backend-go/internal/repo"
 	"yourcloud/backend-go/internal/storage"
 
@@ -14,8 +17,39 @@ import (
 )
 
 type FileService struct {
-	Files   repo.FileRepo
-	Storage storage.Provider
+	Files      repo.FileRepo
+	Storage    storage.Provider
+	QuotaBytes int64 // 0 = no server-side storage cap
+}
+
+func humanQuotaCap(bytes int64) string {
+	if bytes <= 0 {
+		return ""
+	}
+	const (
+		gib = 1024 * 1024 * 1024
+		tib = 1024 * gib
+	)
+	if bytes%tib == 0 && bytes >= tib {
+		return fmt.Sprintf("%d TB", bytes/tib)
+	}
+	if bytes%gib == 0 && bytes >= gib {
+		return fmt.Sprintf("%d GB", bytes/gib)
+	}
+	const mib = 1024 * 1024
+	if bytes%mib == 0 && bytes >= mib {
+		return fmt.Sprintf("%d MB", bytes/mib)
+	}
+	return fmt.Sprintf("%.2f GB", float64(bytes)/float64(gib))
+}
+
+func (s FileService) quotaExceededErr() error {
+	capLabel := humanQuotaCap(s.QuotaBytes)
+	if capLabel == "" {
+		return apperror.New(http.StatusForbidden, "STORAGE_QUOTA_EXCEEDED", "存储空间已满，无法继续上传。", nil)
+	}
+	return apperror.New(http.StatusForbidden, "STORAGE_QUOTA_EXCEEDED",
+		fmt.Sprintf("存储空间已满（单用户上限 %s），无法继续上传。", capLabel), nil)
 }
 
 func normalizePath(path string) string {
@@ -41,10 +75,31 @@ func isSameOrChildPath(targetPath, folderPath string) bool {
 }
 
 func (s FileService) Upload(ownerID uint, fh *multipart.FileHeader, folderPath string) (*model.File, error) {
+	used, err := s.Files.SumSizeByOwner(ownerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.QuotaBytes > 0 {
+		incoming := fh.Size
+		if incoming < 0 {
+			incoming = 0
+		}
+		if used+incoming > s.QuotaBytes {
+			return nil, s.quotaExceededErr()
+		}
+	}
+
 	storedPath, size, err := s.Storage.Save(fh)
 	if err != nil {
 		return nil, err
 	}
+
+	if s.QuotaBytes > 0 && used+size > s.QuotaBytes {
+		_ = s.Storage.Delete(storedPath)
+		return nil, s.quotaExceededErr()
+	}
+
 	f := &model.File{
 		OwnerID:    ownerID,
 		Filename:   joinFolderAndFilename(folderPath, fh.Filename),

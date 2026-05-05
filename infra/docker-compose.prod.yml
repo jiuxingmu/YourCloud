@@ -26,6 +26,8 @@ services:
       STORAGE_PROVIDER: local
       STORAGE_PATH: /app/uploads
       JWT_TTL_MIN: ${JWT_TTL_MIN:-10080}
+      # Per-user stored bytes cap (sum of file sizes). Default 10 GiB if unset in shell.
+      USER_STORAGE_QUOTA_BYTES: ${USER_STORAGE_QUOTA_BYTES:-10737418240}
     volumes:
       - uploads:/app/uploads
     ports:

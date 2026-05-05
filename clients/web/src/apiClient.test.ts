@@ -11,6 +11,14 @@ describe('toUserFriendlyErrorMessage', () => {
     const err = new ApiRequestError('Failed to fetch', { isNetworkError: true })
     expect(toUserFriendlyErrorMessage(err, 'files')).toBe('网络连接异常，请检查网络后重试。')
   })
+
+  it('surfaces storage quota errors from the API', () => {
+    const err = new ApiRequestError('存储空间已满（单用户上限 10 GB），无法继续上传。', {
+      status: 403,
+      code: 'STORAGE_QUOTA_EXCEEDED',
+    })
+    expect(toUserFriendlyErrorMessage(err, 'files')).toBe('存储空间已满（单用户上限 10 GB），无法继续上传。')
+  })
 })
 
 describe('request', () => {

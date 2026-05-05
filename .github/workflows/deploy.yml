@@ -116,6 +116,7 @@ jobs:
               -e STORAGE_PROVIDER=local \
               -e STORAGE_PATH=/app/uploads \
               -e JWT_TTL_MIN=10080 \
+              -e USER_STORAGE_QUOTA_BYTES=10737418240 \
               -v yourcloud_uploads:/app/uploads \
               "$API_IMAGE"
 

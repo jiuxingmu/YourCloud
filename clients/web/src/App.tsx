@@ -119,7 +119,7 @@ export default function App() {
   const [settingsAnchor, setSettingsAnchor] = useState<null | HTMLElement>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [usedBytes, setUsedBytes] = useState(0)
-  const totalBytes = 2 * 1024 * 1024 * 1024 * 1024
+  const totalBytes = 100 * 1024 * 1024 * 1024
   const shouldRenderSharePage = shareRoute || !!shareToken
   const shouldRenderShell = shouldRenderSharePage || loggedIn
 

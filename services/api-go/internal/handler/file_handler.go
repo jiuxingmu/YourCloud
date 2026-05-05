@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"yourcloud/backend-go/internal/pkg/apperror"
 	"yourcloud/backend-go/internal/preview"
 	"yourcloud/backend-go/internal/service"
 
@@ -27,6 +28,11 @@ func (h FileHandler) Upload(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 	f, err := h.Files.Upload(userID, fileHeader, targetPath)
 	if err != nil {
+		var appErr apperror.AppError
+		if errors.As(err, &appErr) {
+			c.JSON(appErr.Status, gin.H{"error": gin.H{"code": appErr.Code, "message": appErr.Message}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "UPLOAD_FAILED", "message": err.Error()}})
 		return
 	}

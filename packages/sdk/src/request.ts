@@ -55,6 +55,10 @@ function toUserFriendlyErrorMessage(error: unknown, context: RequestContext = 'g
       if (error.status === 429) return '登录尝试过于频繁，请稍后再试。'
     }
 
+    if (error.code === 'STORAGE_QUOTA_EXCEEDED') {
+      return error.message.trim() || '存储空间已满，上传失败。'
+    }
+
     if (error.status !== undefined && error.status >= 500) {
       return '服务暂时不可用，请稍后重试。'
     }

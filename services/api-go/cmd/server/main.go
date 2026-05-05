@@ -30,7 +30,7 @@ func main() {
 
 	authSvc := service.AuthService{Users: userRepo, JWTSecret: cfg.JWTSecret, TokenTTLMin: cfg.TokenTTLMin}
 	fileStorage := storage.NewProvider(cfg.StorageKind, cfg.StoragePath)
-	fileSvc := service.FileService{Files: fileRepo, Storage: fileStorage}
+	fileSvc := service.FileService{Files: fileRepo, Storage: fileStorage, QuotaBytes: cfg.UserStorageQuotaBytes}
 	shareSvc := service.ShareService{Shares: shareRepo, Files: fileRepo}
 
 	authHandler := handler.AuthHandler{Auth: authSvc}
@@ -75,7 +75,11 @@ func main() {
 	protected.GET("/shares", shareHandler.ListMine)
 	protected.PATCH("/shares/:id/revoke", shareHandler.RevokeMine)
 
-	log.Printf("backend listening on :%s", cfg.Port)
+	if cfg.UserStorageQuotaBytes > 0 {
+		log.Printf("backend listening on :%s (per-user storage quota: %d bytes)", cfg.Port, cfg.UserStorageQuotaBytes)
+	} else {
+		log.Printf("backend listening on :%s (per-user storage quota: unlimited)", cfg.Port)
+	}
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}
