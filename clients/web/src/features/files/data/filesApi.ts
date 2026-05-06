@@ -1,6 +1,6 @@
 import { sdkClient } from '../../../apiClient'
 import type { FileItem } from '../domain'
-import type { ManagedShareItem, ShareCreateResponse, ShareGetByTokenResponse } from '@yourcloud/sdk'
+import type { FileUploadProgress, ManagedShareItem, ShareCreateResponse, ShareGetByTokenResponse } from '@yourcloud/sdk'
 export type { ManagedShareItem, ShareCreateResponse, ShareGetByTokenResponse } from '@yourcloud/sdk'
 
 export function getApiBaseUrl(): string {
@@ -39,7 +39,11 @@ export async function uploadFile(file: File, folderPath = ''): Promise<FileItem>
   return await uploadFileWithProgress(file, folderPath)
 }
 
-export async function uploadFileWithProgress(file: File, folderPath = '', onProgress?: (percent: number) => void): Promise<FileItem> {
+export async function uploadFileWithProgress(
+  file: File,
+  folderPath = '',
+  onProgress?: (progress: FileUploadProgress) => void,
+): Promise<FileItem> {
   return await sdkClient.fileUploadWithProgress(file, folderPath, onProgress)
 }
 

@@ -1,6 +1,7 @@
 import type {
   AuthTokenResponse,
   FileItem,
+  FileUploadProgress,
   ManagedShareItem,
   RequestContext,
   SdkClient,
@@ -224,11 +225,14 @@ class SdkClientImpl implements SdkClient {
   fileUploadWithProgress = async (
     file: UploadFilePayload | Blob,
     folderPath = '',
-    onProgress?: (percent: number) => void,
+    onProgress?: (progress: FileUploadProgress) => void,
   ): Promise<FileItem> => {
     const form = new FormData()
     form.append('file', file as unknown as Blob)
     form.append('path', folderPath)
+
+    const blobTotal =
+      typeof Blob !== 'undefined' && file instanceof Blob && Number.isFinite(file.size) && file.size > 0 ? file.size : 0
 
     return await new Promise<FileItem>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
@@ -239,10 +243,24 @@ class SdkClientImpl implements SdkClient {
         xhr.setRequestHeader(k, v)
       }
 
+      const emitProgress = (snapshot: FileUploadProgress) => {
+        onProgress?.({
+          loaded: snapshot.loaded,
+          total: snapshot.total,
+          percent: Math.max(0, Math.min(100, snapshot.percent)),
+        })
+      }
+
+      let lastProgress: FileUploadProgress = { loaded: 0, total: blobTotal, percent: 0 }
+
       xhr.upload.onprogress = (event) => {
-        if (!onProgress || !event.lengthComputable) return
-        const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)))
-        onProgress(percent)
+        if (!onProgress) return
+        const total =
+          event.lengthComputable && event.total > 0 ? event.total : blobTotal > 0 ? blobTotal : 0
+        const loaded = event.loaded
+        const percent = total > 0 ? Math.round((loaded / total) * 100) : 0
+        lastProgress = { loaded, total, percent }
+        emitProgress(lastProgress)
       }
 
       xhr.onerror = () => {
@@ -277,7 +295,9 @@ class SdkClientImpl implements SdkClient {
           reject(new ApiRequestError('上传响应数据异常'))
           return
         }
-        onProgress?.(100)
+        const finalTotal = lastProgress.total > 0 ? lastProgress.total : lastProgress.loaded
+        const finalLoaded = finalTotal > 0 ? finalTotal : lastProgress.loaded
+        emitProgress({ loaded: finalLoaded, total: finalTotal, percent: 100 })
         resolve(data)
       }
 

@@ -6,14 +6,30 @@ import { mergeVirtualAndRemoteFiles, type FileItem } from '../domain'
 type FeedbackFn = (type: 'success' | 'error', text: string) => void
 type ErrorMessageFn = (error: unknown) => string
 
+export type WebUploadProgress = {
+  percent: number
+  loaded: number
+  total: number
+  speedBps: number | null
+}
+
+const initialUploadProgress: WebUploadProgress = {
+  percent: 0,
+  loaded: 0,
+  total: 0,
+  speedBps: null,
+}
+
 export function useFilesData(showFeedback: FeedbackFn, toErrorMessage: ErrorMessageFn) {
   const [files, setFiles] = useState<FileItem[]>([])
   const [virtualFolders, setVirtualFolders] = useState<FileItem[]>([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadProgress, setUploadProgress] = useState<WebUploadProgress>(initialUploadProgress)
   const [uploadingFilename, setUploadingFilename] = useState('')
   const virtualFoldersRef = useRef<FileItem[]>([])
+  const uploadSpeedSampleRef = useRef<{ loaded: number; time: number } | null>(null)
+  const uploadSpeedSmoothedRef = useRef<number | null>(null)
 
   async function load() {
     setLoading(true)
@@ -29,10 +45,33 @@ export function useFilesData(showFeedback: FeedbackFn, toErrorMessage: ErrorMess
 
   async function upload(file: File, folderPath = '') {
     setUploading(true)
-    setUploadProgress(0)
+    uploadSpeedSampleRef.current = null
+    uploadSpeedSmoothedRef.current = null
+    setUploadProgress(initialUploadProgress)
     setUploadingFilename(file.name)
     try {
-      await uploadFileWithProgress(file, folderPath, setUploadProgress)
+      await uploadFileWithProgress(file, folderPath, (p) => {
+        const now = performance.now()
+        const prev = uploadSpeedSampleRef.current
+        let speedBps: number | null = uploadSpeedSmoothedRef.current
+        if (prev && p.loaded > prev.loaded) {
+          const dt = now - prev.time
+          if (dt >= 50) {
+            const instant = ((p.loaded - prev.loaded) / dt) * 1000
+            if (instant > 0) {
+              speedBps = speedBps === null ? instant : speedBps * 0.65 + instant * 0.35
+            }
+          }
+        }
+        uploadSpeedSampleRef.current = { loaded: p.loaded, time: now }
+        uploadSpeedSmoothedRef.current = speedBps
+        setUploadProgress({
+          percent: p.percent,
+          loaded: p.loaded,
+          total: p.total,
+          speedBps,
+        })
+      })
       showFeedback('success', '上传成功。')
       await load()
       emitFilesChanged()
@@ -40,8 +79,10 @@ export function useFilesData(showFeedback: FeedbackFn, toErrorMessage: ErrorMess
       showFeedback('error', toErrorMessage(error))
     } finally {
       setUploading(false)
-      setUploadProgress(0)
+      setUploadProgress(initialUploadProgress)
       setUploadingFilename('')
+      uploadSpeedSampleRef.current = null
+      uploadSpeedSmoothedRef.current = null
     }
   }
 

@@ -71,6 +71,13 @@ export type UploadFilePayload = {
   type?: string
 }
 
+/** Progress snapshot for multipart uploads (browser XMLHttpRequest). */
+export type FileUploadProgress = {
+  loaded: number
+  total: number
+  percent: number
+}
+
 export type DownloadResult = {
   uri: string
 }
@@ -94,7 +101,11 @@ export type SdkClient = {
   fileMove: (id: number, filename: string) => Promise<void>
   folderCreate: (filename: string) => Promise<FileItem>
   fileUpload: (file: UploadFilePayload, folderPath?: string) => Promise<FileItem>
-  fileUploadWithProgress: (file: UploadFilePayload | Blob, folderPath?: string, onProgress?: (percent: number) => void) => Promise<FileItem>
+  fileUploadWithProgress: (
+    file: UploadFilePayload | Blob,
+    folderPath?: string,
+    onProgress?: (progress: FileUploadProgress) => void,
+  ) => Promise<FileItem>
   fileFetchDownloadBlob: (id: number) => Promise<Blob>
   fileFetchThumbnailBlob: (id: number) => Promise<Blob>
   fileDownloadToFile: (id: number, destination: string) => Promise<DownloadResult>

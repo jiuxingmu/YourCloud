@@ -7,6 +7,8 @@ import { FilesListTable } from '../features/files/components/FilesListTable'
 import { FileActionMenu, FileFilterMenu } from '../features/files/components/FilesMenus'
 import { FilesSectionContent } from '../features/files/components/FilesSectionContent'
 import type { DeletedItem, FileItem, FileSection, TimeFilter, TypeFilter } from '../features/files/domain'
+import type { WebUploadProgress } from '../features/files/hooks/useFilesData'
+import { formatBytes, formatBytesPerSec } from '../shared/formatBytes'
 import { FolderPlusIcon, RefreshLineIcon, UploadIcon } from '../shared/icons/YourCloudIcons'
 
 type FeedbackState = { type: 'success' | 'error'; text: string } | null
@@ -58,7 +60,7 @@ type Props = {
   section: FileSection
   loading: boolean
   uploading: boolean
-  uploadProgress: number
+  uploadProgress: WebUploadProgress
   uploadingFilename: string
   viewMode: ViewMode
   setViewMode: (mode: ViewMode) => void
@@ -181,13 +183,21 @@ export default function FilesPageView(props: Props) {
         </Stack>
         {uploading && (
           <Box sx={{ mb: 1.5 }}>
-            <Typography variant="caption" color="text.secondary">
-              正在上传：{uploadingFilename || '文件'} ({uploadProgress}%)
+            <Typography variant="caption" color="text.secondary" component="div" sx={{ lineHeight: 1.5 }}>
+              正在上传：{uploadingFilename || '文件'}
+              {uploadProgress.total > 0
+                ? ` · ${formatBytes(uploadProgress.loaded)} / ${formatBytes(uploadProgress.total)}（${uploadProgress.percent}%）`
+                : uploadProgress.loaded > 0
+                  ? ` · 已上传 ${formatBytes(uploadProgress.loaded)}`
+                  : ` · ${uploadProgress.percent}%`}
+              {uploadProgress.speedBps !== null && uploadProgress.speedBps > 0
+                ? ` · ${formatBytesPerSec(uploadProgress.speedBps)}`
+                : null}
             </Typography>
             <Box sx={{ mt: 0.6, height: 6, borderRadius: 3, bgcolor: '#e8ecf3', overflow: 'hidden' }}>
               <Box
                 sx={{
-                  width: `${uploadProgress}%`,
+                  width: `${uploadProgress.percent}%`,
                   height: '100%',
                   bgcolor: '#1a73e8',
                   transition: 'width .2s ease',
