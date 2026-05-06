@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyPreviewKind } from '@yourcloud/sdk'
-import { shouldFetchPreviewSource } from './FilePreview'
+import { classifyPreviewKind, shouldFetchPreviewSource } from '@yourcloud/sdk'
 
 describe('classifyPreviewKind', () => {
   it('classifies image and video from mime type', () => {

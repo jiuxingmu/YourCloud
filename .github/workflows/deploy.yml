@@ -46,7 +46,7 @@ jobs:
       - name: Build and push Web image
         uses: docker/build-push-action@v6
         with:
-          context: ./clients/web
+          context: .
           file: ./clients/web/Dockerfile
           push: true
           build-args: |
