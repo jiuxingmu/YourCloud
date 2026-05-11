@@ -125,8 +125,12 @@ export const filesStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   modalMask: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15,23,42,0.30)',
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   nativeSheet: {
     position: 'absolute',
@@ -152,6 +156,10 @@ export const filesStyles = StyleSheet.create({
   sheetActionText: {
     fontSize: 16,
     color: '#1E2C45',
+  },
+  sheetActionDangerText: {
+    fontSize: 16,
+    color: '#E11D48',
   },
   bottomSheet: {
     backgroundColor: '#fff',
@@ -219,26 +227,7 @@ export const filesStyles = StyleSheet.create({
   btnDisabled: {
     opacity: 0.6,
   },
-  actionPalette: {
-    position: 'absolute',
-    left: 18,
-    right: 18,
-    bottom: 110,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-  },
-  paletteAction: {
-    alignItems: 'center',
-    width: 72,
-  },
-  paletteText: {
-    marginTop: 6,
-    fontSize: 14,
-    color: '#1F2937',
-  },
+  actionPalette: {},
+  paletteAction: {},
+  paletteText: {},
 });

@@ -343,6 +343,28 @@ export function FilesScreen() {
     setQuickSheetVisible(true);
   }
 
+  function openFileActions(item: FileItem) {
+    if (Platform.OS === 'ios') {
+      const isDownloading = downloadingFileId === item.id;
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['取消', isDownloading ? '下载中...' : '下载', '分享', '删除'],
+          cancelButtonIndex: 0,
+          destructiveButtonIndex: 3,
+          disabledButtonIndices: isDownloading ? [1] : [],
+        },
+        (idx) => {
+          if (idx === 1 && !isDownloading) void downloadFile(item.id);
+          if (idx === 2) openShareDialog(item);
+          if (idx === 3) askDelete(item);
+        },
+      );
+      return;
+    }
+    setSelectedFile(item);
+    setMenuVisible(true);
+  }
+
   return (
     <View style={styles.container}>
       <FilesPathBar
@@ -369,10 +391,7 @@ export function FilesScreen() {
             authHeaders={client.authHeaders()}
             buildThumbnailUrl={client.fileBuildThumbnailUrl}
             onOpen={openFileOrFolder}
-            onMore={(value) => {
-              setSelectedFile(value);
-              setMenuVisible(true);
-            }}
+            onMore={openFileActions}
           />
         )}
         ListEmptyComponent={

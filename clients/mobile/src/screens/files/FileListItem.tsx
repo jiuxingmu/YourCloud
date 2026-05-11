@@ -37,7 +37,7 @@ export function FileListItem({ item, index, authHeaders, buildThumbnailUrl, onOp
             {displayName}
           </Text>
           <Text style={styles.fileMeta}>
-            {formatFileSize(item.size)} · {formatFileDate(item.updatedAt || item.createdAt)}
+            {isFolder ? formatFileDate(item.updatedAt || item.createdAt) : `${formatFileSize(item.size)} · ${formatFileDate(item.updatedAt || item.createdAt)}`}
           </Text>
         </View>
         <ScalePressable style={styles.moreButton} onPress={() => onMore(item)}>
