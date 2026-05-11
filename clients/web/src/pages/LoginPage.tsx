@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent, type SyntheticEvent } from 'react'
 import { Alert, Avatar, Box, Button, Card, CardContent, Divider, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@mui/material'
 import { request, toUserFriendlyErrorMessage } from '../apiClient'
+import IcpBeianFooter from '../components/IcpBeianFooter'
 
 type Props = { onSuccess: () => void }
 
@@ -69,15 +70,17 @@ export default function LoginPage({ onSuccess }: Props) {
   }
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        px: { xs: 2, sm: 3 },
-        py: 3,
-      }}
-    >
+    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <Box
+        sx={{
+          flex: 1,
+          display: 'grid',
+          placeItems: 'center',
+          minHeight: 0,
+          px: { xs: 2, sm: 3 },
+          py: 3,
+        }}
+      >
       <Card
         sx={{
           width: '100%',
@@ -154,6 +157,8 @@ export default function LoginPage({ onSuccess }: Props) {
           </Stack>
         </CardContent>
       </Card>
+      </Box>
+      <IcpBeianFooter />
       <Snackbar open={Boolean(feedback)} autoHideDuration={4000} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         {feedback ? (
           <Alert onClose={() => setFeedback(null)} closeText="关闭" severity={feedback.type} variant="filled" sx={{ width: '100%' }}>

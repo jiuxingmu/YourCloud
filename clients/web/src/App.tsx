@@ -31,6 +31,7 @@ import { formatBytes } from '@yourcloud/sdk'
 import { emitStarredCleared, emitTrashCleared, onFilesChanged } from './features/files/data/filesEvents'
 import { clearDeletedItems, clearSearchHistory, clearStarredIds, readSearchHistory, writeSearchHistory } from './features/files/data/filesStorage'
 import { ClockIcon, HomeIcon, SearchLineIcon, SettingsIcon, ShareLineIcon, StarIcon, TrashIcon } from './shared/icons/YourCloudIcons'
+import IcpBeianFooter from './components/IcpBeianFooter'
 import FilesPage from './pages/FilesPage'
 import LoginPage from './pages/LoginPage'
 import SharePage from './pages/SharePage'
@@ -333,46 +334,56 @@ export default function App() {
               </Toolbar>
             </AppBar>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '256px minmax(0, 1fr)' }, pt: '64px', minHeight: '100vh' }}>
-              <Box sx={{ borderRight: '1px solid #edf0f2', px: 1.5, py: 2, display: { xs: 'none', md: 'block' } }}>
-                <List dense>
-                  {navItems.map((item) => (
-                    <ListItemButton
-                      key={item.id}
-                      selected={activeNav === item.id}
-                      onClick={() => setActiveNav(item.id)}
-                      sx={{
-                        borderRadius: 0,
-                        mb: 0.35,
-                        minHeight: 40,
-                        '&.Mui-selected': { bgcolor: '#d3e3fd', '&:hover': { bgcolor: '#c7dafd' } },
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 34, color: 'text.secondary' }}>{item.icon}</ListItemIcon>
-                      <ListItemText primary={<Typography sx={{ fontSize: 14 }}>{item.label}</Typography>} />
-                    </ListItemButton>
-                  ))}
-                </List>
-                <Box sx={{ mt: 2.5, px: 1 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    存储
-                  </Typography>
-                  <LinearProgress variant="determinate" value={Math.max(1, Math.min(100, (usedBytes / totalBytes) * 100))} sx={{ mt: 1, mb: 0.8, height: 6, borderRadius: 0 }} />
-                  <Typography variant="caption" color="text.secondary">
-                    已用 {formatBytes(usedBytes)}，共 {formatBytes(totalBytes)}
-                  </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', pt: '64px', minHeight: '100vh' }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: '256px minmax(0, 1fr)' },
+                  minHeight: 0,
+                }}
+              >
+                <Box sx={{ borderRight: '1px solid #edf0f2', px: 1.5, py: 2, display: { xs: 'none', md: 'block' } }}>
+                  <List dense>
+                    {navItems.map((item) => (
+                      <ListItemButton
+                        key={item.id}
+                        selected={activeNav === item.id}
+                        onClick={() => setActiveNav(item.id)}
+                        sx={{
+                          borderRadius: 0,
+                          mb: 0.35,
+                          minHeight: 40,
+                          '&.Mui-selected': { bgcolor: '#d3e3fd', '&:hover': { bgcolor: '#c7dafd' } },
+                        }}
+                      >
+                        <ListItemIcon sx={{ minWidth: 34, color: 'text.secondary' }}>{item.icon}</ListItemIcon>
+                        <ListItemText primary={<Typography sx={{ fontSize: 14 }}>{item.label}</Typography>} />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                  <Box sx={{ mt: 2.5, px: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      存储
+                    </Typography>
+                    <LinearProgress variant="determinate" value={Math.max(1, Math.min(100, (usedBytes / totalBytes) * 100))} sx={{ mt: 1, mb: 0.8, height: 6, borderRadius: 0 }} />
+                    <Typography variant="caption" color="text.secondary">
+                      已用 {formatBytes(usedBytes)}，共 {formatBytes(totalBytes)}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, minHeight: 0 }}>
+                  {shouldRenderSharePage ? (
+                    <SharePage token={shareToken ?? ''} />
+                  ) : activeNav === 'shares' ? (
+                    <SharesPage />
+                  ) : (
+                    <FilesPage searchQuery={searchQuery} section={activeNav} />
+                  )}
                 </Box>
               </Box>
-
-              <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 } }}>
-                {shouldRenderSharePage ? (
-                  <SharePage token={shareToken ?? ''} />
-                ) : activeNav === 'shares' ? (
-                  <SharesPage />
-                ) : (
-                  <FilesPage searchQuery={searchQuery} section={activeNav} />
-                )}
-              </Box>
+              <IcpBeianFooter />
             </Box>
             <Menu
               anchorEl={settingsAnchor}
